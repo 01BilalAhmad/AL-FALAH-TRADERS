@@ -12,6 +12,8 @@ import {
   Dimensions,
   TextInput,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { BarChart } from 'react-native-chart-kit';
@@ -52,11 +54,20 @@ export const ShopDetailModal = memo(function ShopDetailModal({
   const [noteInput, setNoteInput] = useState('');
   const [noteSaving, setNoteSaving] = useState(false);
 
+  // Phone edit state
+  const [editingPhone, setEditingPhone] = useState(false);
+  const [phoneInput, setPhoneInput] = useState('');
+  const [phoneSaving, setPhoneSaving] = useState(false);
+  const [localPhone, setLocalPhone] = useState<string | null>(null);
+
   useEffect(() => {
     if (visible && shop) {
       loadRecent();
       loadChartData();
       loadShopNote();
+      setLocalPhone(null);
+      setEditingPhone(false);
+      setPhoneInput('');
     }
   }, [visible, shop]);
 
@@ -155,6 +166,87 @@ export const ShopDetailModal = memo(function ShopDetailModal({
     ]);
   }
 
+  // Current phone: local override or shop prop
+  const currentPhone = localPhone ?? shop?.phone ?? '';
+
+  function handleSmsPress() {
+    if (!shop) return;
+    if (!currentPhone) {
+      Alert.alert(
+        'No Phone Number',
+        "This shop doesn't have a phone number saved.",
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Add Phone Number',
+            onPress: () => {
+              setPhoneInput('');
+              setEditingPhone(true);
+            },
+          },
+        ]
+      );
+      return;
+    }
+    const phone = currentPhone.trim().replace(/[^0-9+]/g, '');
+    Linking.openURL(`sms:${phone}`);
+  }
+
+  function handleWhatsappPress() {
+    if (!shop) return;
+    if (!currentPhone) {
+      Alert.alert(
+        'No Phone Number',
+        "This shop doesn't have a phone number saved.",
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Add Phone Number',
+            onPress: () => {
+              setPhoneInput('');
+              setEditingPhone(true);
+            },
+          },
+        ]
+      );
+      return;
+    }
+    let formattedPhone = currentPhone.trim().replace(/[^0-9]/g, '');
+    if (formattedPhone.startsWith('0')) {
+      formattedPhone = formattedPhone.substring(1);
+    }
+    if (!formattedPhone.startsWith('92')) {
+      formattedPhone = '92' + formattedPhone;
+    }
+    Linking.openURL(`https://wa.me/${formattedPhone}`);
+  }
+
+  async function handleSavePhone() {
+    if (!shop) return;
+    const trimmed = phoneInput.trim();
+    if (!trimmed) {
+      Alert.alert('Invalid Phone', 'Please enter a valid phone number.');
+      return;
+    }
+    setPhoneSaving(true);
+    try {
+      await ApiService.updateShopPhone(shop.id, trimmed);
+      setLocalPhone(trimmed);
+      setEditingPhone(false);
+      setPhoneInput('');
+      Alert.alert('Phone Updated', 'Phone number has been updated successfully.');
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to update phone number. Please try again.');
+    } finally {
+      setPhoneSaving(false);
+    }
+  }
+
+  function handleEditPhone() {
+    setPhoneInput(currentPhone);
+    setEditingPhone(true);
+  }
+
   if (!shop) return null;
 
   const { balance: displayBalance, creditLimit: displayCreditLimit } = getShopDisplayBalance(shop, companyId);
@@ -195,23 +287,52 @@ export const ShopDetailModal = memo(function ShopDetailModal({
                   <Text style={styles.chipText}>{shop.area}</Text>
                 </View>
               ) : null}
-              {shop.routeDay ? (
+              {shop.routeDays && shop.routeDays.length > 0 ? (
                 <View style={[styles.chip, { backgroundColor: Colors.primaryLight }]}>
                   <MaterialIcons name="calendar-today" size={13} color={Colors.primaryDark} />
                   <Text style={[styles.chipText, { color: Colors.primaryDark }]}>
-                    {shop.routeDay.charAt(0).toUpperCase() + shop.routeDay.slice(1)}
+                    {shop.routeDays.map(d => d.charAt(0).toUpperCase() + d.slice(1)).join(', ')}
                   </Text>
                 </View>
               ) : null}
-              {shop.phone ? (
+              {currentPhone ? (
+                <View style={styles.phoneChipRow}>
+                  <Pressable
+                    style={[styles.chip, { backgroundColor: '#EFF6FF' }]}
+                    onPress={() => Linking.openURL(`tel:${currentPhone}`)}
+                  >
+                    <MaterialIcons name="call" size={13} color="#2563EB" />
+                    <Text style={[styles.chipText, { color: '#2563EB' }]}>{currentPhone}</Text>
+                  </Pressable>
+                  <Pressable onPress={handleEditPhone} hitSlop={8} style={styles.phoneEditBtn}>
+                    <MaterialIcons name="edit" size={14} color="#2563EB" />
+                  </Pressable>
+                </View>
+              ) : (
                 <Pressable
-                  style={[styles.chip, { backgroundColor: '#EFF6FF' }]}
-                  onPress={() => Linking.openURL(`tel:${shop.phone}`)}
+                  style={[styles.chip, { backgroundColor: '#FEF3C7', borderColor: '#F59E0B', borderWidth: 1 }]}
+                  onPress={handleEditPhone}
                 >
-                  <MaterialIcons name="call" size={13} color="#2563EB" />
-                  <Text style={[styles.chipText, { color: '#2563EB' }]}>{shop.phone}</Text>
+                  <MaterialIcons name="phone-disabled" size={13} color="#D97706" />
+                  <Text style={[styles.chipText, { color: '#D97706' }]}>No phone</Text>
+                  <MaterialIcons name="add-circle-outline" size={12} color="#D97706" />
                 </Pressable>
-              ) : null}
+              )}
+              {/* SMS & WhatsApp action chips */}
+              <Pressable
+                style={[styles.chip, { backgroundColor: '#E0F2FE' }]}
+                onPress={handleSmsPress}
+              >
+                <MaterialIcons name="sms" size={13} color="#0284C7" />
+                <Text style={[styles.chipText, { color: '#0284C7' }]}>SMS</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.chip, { backgroundColor: '#DCFCE7' }]}
+                onPress={handleWhatsappPress}
+              >
+                <MaterialIcons name="chat" size={13} color="#16A34A" />
+                <Text style={[styles.chipText, { color: '#16A34A' }]}>WhatsApp</Text>
+              </Pressable>
             </View>
 
             {/* Balance + Credit cards */}
@@ -450,6 +571,69 @@ export const ShopDetailModal = memo(function ShopDetailModal({
             </Pressable>
           </View>
         </View>
+
+        {/* Phone Edit Modal */}
+        <Modal visible={editingPhone} transparent animationType="fade">
+          <KeyboardAvoidingView
+            style={styles.phoneEditBackdrop}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          >
+            <View style={styles.phoneEditCard}>
+              <View style={styles.phoneEditHeader}>
+                <View style={styles.phoneEditIconWrap}>
+                  <MaterialIcons name="phone" size={22} color="#2563EB" />
+                </View>
+                <Text style={styles.phoneEditTitle}>Edit Phone Number</Text>
+                <Text style={styles.phoneEditSubtitle}>{shop.name}</Text>
+              </View>
+              <View style={styles.phoneEditInputWrap}>
+                <MaterialIcons name="call" size={18} color={Colors.textMuted} />
+                <TextInput
+                  style={styles.phoneEditInput}
+                  value={phoneInput}
+                  onChangeText={setPhoneInput}
+                  placeholder="e.g. 03001234567"
+                  placeholderTextColor={Colors.textMuted}
+                  keyboardType="phone-pad"
+                  maxLength={15}
+                  autoFocus
+                />
+                {phoneInput ? (
+                  <Pressable onPress={() => setPhoneInput('')} hitSlop={8}>
+                    <MaterialIcons name="cancel" size={16} color={Colors.textMuted} />
+                  </Pressable>
+                ) : null}
+              </View>
+              <View style={styles.phoneEditActions}>
+                <Pressable
+                  style={({ pressed }) => [styles.phoneEditCancelBtn, pressed && { opacity: 0.7 }]}
+                  onPress={() => { setEditingPhone(false); setPhoneInput(''); }}
+                  disabled={phoneSaving}
+                >
+                  <Text style={styles.phoneEditCancelText}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.phoneEditSaveBtn,
+                    (!phoneInput.trim() || phoneSaving) && styles.phoneEditSaveBtnDisabled,
+                    pressed && { opacity: 0.7 },
+                  ]}
+                  onPress={handleSavePhone}
+                  disabled={!phoneInput.trim() || phoneSaving}
+                >
+                  {phoneSaving ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <MaterialIcons name="check" size={16} color="#FFFFFF" />
+                  )}
+                  <Text style={styles.phoneEditSaveText}>
+                    {phoneSaving ? 'Saving...' : 'Save'}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
       </View>
     </Modal>
   );
@@ -867,6 +1051,114 @@ const styles = StyleSheet.create({
   },
   noteSaveBtnText: {
     fontSize: FontSize.xs,
+    fontWeight: FontWeight.bold,
+    color: '#FFFFFF',
+  },
+  // Phone chip row & edit
+  phoneChipRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  phoneEditBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Phone Edit Modal styles
+  phoneEditBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.lg,
+  },
+  phoneEditCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xl,
+    padding: Spacing.lg,
+    width: '100%',
+    maxWidth: 380,
+    ...Shadow.xl,
+  },
+  phoneEditHeader: {
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  phoneEditIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.sm,
+  },
+  phoneEditTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.bold,
+    color: Colors.text,
+  },
+  phoneEditSubtitle: {
+    fontSize: FontSize.sm,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  phoneEditInputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.background,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    marginBottom: Spacing.md,
+    gap: Spacing.xs,
+  },
+  phoneEditInput: {
+    flex: 1,
+    fontSize: FontSize.md,
+    color: Colors.text,
+    paddingVertical: 12,
+  },
+  phoneEditActions: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  phoneEditCancelBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.background,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  phoneEditCancelText: {
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.semibold,
+    color: Colors.textSecondary,
+  },
+  phoneEditSaveBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 14,
+    borderRadius: Radius.md,
+    backgroundColor: '#2563EB',
+  },
+  phoneEditSaveBtnDisabled: {
+    opacity: 0.5,
+  },
+  phoneEditSaveText: {
+    fontSize: FontSize.base,
     fontWeight: FontWeight.bold,
     color: '#FFFFFF',
   },

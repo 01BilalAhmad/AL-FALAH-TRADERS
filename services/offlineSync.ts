@@ -114,6 +114,7 @@ export async function syncOfflineRecoveries(): Promise<SyncResult> {
           gpsLng: item.gpsLng,
           gpsAddress: item.gpsAddress,
           companyId,
+          idempotencyKey: item.id, // Use offline item ID as idempotency key to prevent duplicates
         });
         // Also create a ShopVisit record so admin map shows the location
         if (item.gpsLat && item.gpsLng) {

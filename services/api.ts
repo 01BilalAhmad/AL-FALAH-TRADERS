@@ -29,7 +29,7 @@ export interface Shop {
   area: string;
   address: string;
   phone: string;
-  routeDay: string;
+  routeDays: string[];  // Array of route days (e.g., ['monday', 'thursday'] for twice-weekly shops)
   orderbookerId: string;
   balance: number;
   creditLimit: number;
@@ -169,6 +169,7 @@ export const ApiService = {
     gpsAddress?: string;
     outOfRange?: boolean;
     companyId?: string;
+    idempotencyKey?: string;
   }) =>
     request<Transaction>('/api/transactions', {
       method: 'POST',
@@ -240,5 +241,11 @@ export const ApiService = {
     request<any>(`/api/shops/${shopId}/visits`, {
       method: 'POST',
       body: JSON.stringify(payload),
+    }),
+
+  updateShopPhone: (shopId: string, phone: string) =>
+    request<{ success: boolean; shopId: string; newPhone: string }>('/api/shops/phone', {
+      method: 'PATCH',
+      body: JSON.stringify({ shopId, phone }),
     }),
 };

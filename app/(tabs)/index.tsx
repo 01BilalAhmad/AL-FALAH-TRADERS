@@ -202,6 +202,8 @@ export default function TodayRouteScreen() {
     const shopId = recoveryShop.id;
     const shopPhone = recoveryShop.phone;
     const openingBalance = recoveryShop.balance;
+    // Generate idempotency key to prevent duplicate submissions
+    const idempotencyKey = `${shopId}_${user.id}_${payload.amount}_${Date.now()}`;
     try {
       if (isOnline) {
         const result = await ApiService.submitRecovery({
@@ -215,6 +217,7 @@ export default function TodayRouteScreen() {
           gpsAddress: payload.gpsAddress,
           outOfRange: payload.outOfRange,
           companyId: user.companyId || undefined,
+          idempotencyKey,
         });
         setVisitedShopIds((prev) => new Set([...prev, shopId]));
         setTodayRecovery((prev) => {
@@ -267,6 +270,22 @@ export default function TodayRouteScreen() {
             recoveryAmount: payload.amount,
             remainingBalance,
           });
+        } else {
+          // No phone number — show alert suggesting to add one
+          Alert.alert(
+            'No Phone Number',
+            `This shop doesn't have a phone number saved. You won't be able to send a recovery notification via SMS or WhatsApp.`,
+            [
+              { text: 'OK', style: 'cancel' },
+              {
+                text: 'Add Phone Number',
+                onPress: () => {
+                  // Open shop detail modal where user can edit phone
+                  setDetailShop(recoveryShop);
+                },
+              },
+            ]
+          );
         }
       } else {
         const localId = `local_${Date.now()}`;
@@ -397,12 +416,13 @@ export default function TodayRouteScreen() {
   const groupedSections = useMemo(() => {
     if (!allRoutesEnabled) return null;
 
-    // Group filtered shops by routeDay
+    // Group filtered shops by routeDays (a shop can appear in multiple day groups)
     const groups: Record<string, Shop[]> = {};
     for (const shop of filteredShops) {
-      const day = shop.routeDay || 'other';
-      if (!groups[day]) groups[day] = [];
-      groups[day].push(shop);
+      for (const day of (shop.routeDays.length > 0 ? shop.routeDays : ['other'])) {
+        if (!groups[day]) groups[day] = [];
+        groups[day].push(shop);
+      }
     }
 
     // Sort: today's route FIRST, then other days by ROUTE_DAYS order
