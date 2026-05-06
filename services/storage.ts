@@ -18,6 +18,7 @@ const KEYS = {
   TODAY_RECOVERY: 'af_today_recovery',
   NOTIF_COUNTS: 'af_notif_counts',
   VISITED_SHOPS: 'af_visited_shops',
+  RECOVERY_SUBMITTED_SHOPS: 'af_recovery_submitted_shops',
 };
 
 export interface PendingNotification {
@@ -452,6 +453,54 @@ export const StorageService = {
         entry.shopIds.push(shopId);
         await AsyncStorage.setItem(KEYS.VISITED_SHOPS, JSON.stringify(entry));
       }
+    } catch { /* non-critical */ }
+  },
+
+  // --- Recovery Submitted Shops (duplicate prevention - persists daily) ---
+  saveRecoverySubmittedShops: async (shopIds: string[]) => {
+    const entry = { date: getTodayDateStr(), shopIds };
+    await AsyncStorage.setItem(KEYS.RECOVERY_SUBMITTED_SHOPS, JSON.stringify(entry));
+  },
+
+  getRecoverySubmittedShops: async (): Promise<string[]> => {
+    try {
+      const raw = await AsyncStorage.getItem(KEYS.RECOVERY_SUBMITTED_SHOPS);
+      if (!raw) return [];
+      const entry = JSON.parse(raw);
+      // Only return if from today, otherwise reset
+      return entry.date === getTodayDateStr() ? entry.shopIds || [] : [];
+    } catch {
+      return [];
+    }
+  },
+
+  addRecoverySubmittedShop: async (shopId: string) => {
+    try {
+      const raw = await AsyncStorage.getItem(KEYS.RECOVERY_SUBMITTED_SHOPS);
+      let entry: { date: string; shopIds: string[] };
+      if (!raw) {
+        entry = { date: getTodayDateStr(), shopIds: [] };
+      } else {
+        entry = JSON.parse(raw);
+        if (entry.date !== getTodayDateStr()) {
+          entry = { date: getTodayDateStr(), shopIds: [] };
+        }
+      }
+      if (!entry.shopIds.includes(shopId)) {
+        entry.shopIds.push(shopId);
+        await AsyncStorage.setItem(KEYS.RECOVERY_SUBMITTED_SHOPS, JSON.stringify(entry));
+      }
+    } catch { /* non-critical */ }
+  },
+
+  removeRecoverySubmittedShop: async (shopId: string) => {
+    try {
+      const raw = await AsyncStorage.getItem(KEYS.RECOVERY_SUBMITTED_SHOPS);
+      if (!raw) return;
+      const entry = JSON.parse(raw);
+      if (entry.date !== getTodayDateStr()) return;
+      entry.shopIds = entry.shopIds.filter((id: string) => id !== shopId);
+      await AsyncStorage.setItem(KEYS.RECOVERY_SUBMITTED_SHOPS, JSON.stringify(entry));
     } catch { /* non-critical */ }
   },
 };

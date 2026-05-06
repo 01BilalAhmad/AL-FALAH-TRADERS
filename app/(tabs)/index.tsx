@@ -37,6 +37,7 @@ import { DailyTargetProgress } from '@/components/ui/DailyTargetProgress';
 import { StorageService, PendingNotification, OfflineRecovery } from '@/services/storage';
 import { RecoveryReminder } from '@/components/ui/RecoveryReminder';
 import { AppTour } from '@/components/ui/AppTour';
+import { PhoneInputModal } from '@/components/ui/PhoneInputModal';
 
 type ChartView = 'trend' | 'analysis' | 'none';
 
@@ -83,6 +84,8 @@ export default function TodayRouteScreen() {
   }>({ visible: false, shopPhone: '', shopName: '', openingBalance: 0, recoveryAmount: 0, remainingBalance: 0 });
   const [visitedShopIds, setVisitedShopIds] = useState<Set<string>>(new Set());
   const [todayRecovery, setTodayRecovery] = useState(0);
+  const [recoverySubmittedShopIds, setRecoverySubmittedShopIds] = useState<Set<string>>(new Set());
+  const [phoneInputShop, setPhoneInputShop] = useState<Shop | null>(null);
 
   // Load cached todayRecovery on mount so it doesn't show 0 after refresh
   useEffect(() => {
@@ -92,6 +95,10 @@ export default function TodayRouteScreen() {
     // Load cached visited shops so they persist across app refreshes
     StorageService.getVisitedShops().then((cached) => {
       if (cached.length > 0) setVisitedShopIds(new Set(cached));
+    });
+    // Load cached recovery submitted shops for duplicate prevention
+    StorageService.getRecoverySubmittedShops().then((cached) => {
+      if (cached.length > 0) setRecoverySubmittedShopIds(new Set(cached));
     });
     // Load cached notification counts so they persist across app refreshes
     StorageService.getNotifCounts().then((counts) => {
@@ -206,6 +213,11 @@ export default function TodayRouteScreen() {
     outOfRange?: boolean;
   }) => {
     if (!recoveryShop || !user) return;
+    // Duplicate recovery prevention - check if recovery already submitted for this shop today
+    if (recoverySubmittedShopIds.has(recoveryShop.id)) {
+      Alert.alert('Already Recovered', `Recovery for ${recoveryShop.name} has already been submitted today. You cannot submit duplicate recovery.`);
+      return;
+    }
     setIsSubmitting(true);
     const shopName = recoveryShop.name;
     const shopId = recoveryShop.id;
@@ -230,6 +242,9 @@ export default function TodayRouteScreen() {
         });
         setVisitedShopIds((prev) => new Set([...prev, shopId]));
         StorageService.addVisitedShop(shopId);
+        // Mark shop as recovery submitted (duplicate prevention)
+        setRecoverySubmittedShopIds((prev) => new Set([...prev, shopId]));
+        StorageService.addRecoverySubmittedShop(shopId);
         setTodayRecovery((prev) => {
           const newTotal = prev + payload.amount;
           StorageService.saveTodayRecovery(newTotal);
@@ -281,21 +296,9 @@ export default function TodayRouteScreen() {
             remainingBalance,
           });
         } else {
-          // No phone number — show alert suggesting to add one
-          Alert.alert(
-            'No Phone Number',
-            `This shop doesn't have a phone number saved. You won't be able to send a recovery notification via SMS or WhatsApp.`,
-            [
-              { text: 'OK', style: 'cancel' },
-              {
-                text: 'Add Phone Number',
-                onPress: () => {
-                  // Open shop detail modal where user can edit phone
-                  setDetailShop(recoveryShop);
-                },
-              },
-            ]
-          );
+          // No phone number — show phone input popup to add number
+          // After saving, NotificationChoice will be shown automatically
+          setPhoneInputShop(recoveryShop);
         }
       } else {
         const localId = `local_${Date.now()}`;
@@ -313,8 +316,11 @@ export default function TodayRouteScreen() {
         });
         if (payload.markGpsVisit) {
           setVisitedShopIds((prev) => new Set([...prev, shopId]));
-        StorageService.addVisitedShop(shopId);
+          StorageService.addVisitedShop(shopId);
         }
+        // Mark shop as recovery submitted (duplicate prevention) for offline too
+        setRecoverySubmittedShopIds((prev) => new Set([...prev, shopId]));
+        StorageService.addRecoverySubmittedShop(shopId);
         // Increment todayRecovery for offline recoveries too
         setTodayRecovery((prev) => {
           const newTotal = prev + payload.amount;
@@ -372,6 +378,13 @@ export default function TodayRouteScreen() {
         StorageService.saveVisitedShops([...next]);
         return next;
       });
+      // Remove from recovery submitted (undo means no longer submitted)
+      setRecoverySubmittedShopIds((prev) => {
+        const next = new Set(prev);
+        next.delete(shopId);
+        StorageService.removeRecoverySubmittedShop(shopId);
+        return next;
+      });
 
       if (isOffline && localId) {
         // Remove from offline queue
@@ -402,6 +415,45 @@ export default function TodayRouteScreen() {
     setShowTour(false);
   }, []);
 
+  // Handle phone number saved from PhoneInputModal → show NotificationChoice
+  const handlePhoneSaved = useCallback((savedPhone: string) => {
+    if (!phoneInputShop || !user) return;
+    const shopName = phoneInputShop.name;
+    const shopId = phoneInputShop.id;
+    const openingBalance = phoneInputShop.balance;
+
+    // Find the last recovery amount for this shop
+    const remainingBalance = openingBalance - (lastRecoveryInfo?.shopId === shopId ? lastRecoveryInfo.amount : 0);
+    const recoveryAmount = lastRecoveryInfo?.shopId === shopId ? lastRecoveryInfo.amount : 0;
+
+    // Create pending notification with the new phone number
+    const pendingNotif: PendingNotification = {
+      id: `${shopId}_${Date.now()}`,
+      shopId,
+      shopName,
+      shopPhone: savedPhone,
+      area: phoneInputShop.area,
+      openingBalance,
+      recoveryAmount,
+      remainingBalance,
+      createdAt: new Date().toISOString(),
+      date: getTodayDateStr(),
+    };
+    StorageService.addPendingNotification(pendingNotif);
+    loadPendingNotifications();
+
+    // Close phone input modal and show notification choice
+    setPhoneInputShop(null);
+    setNotifChoice({
+      visible: true,
+      shopPhone: savedPhone,
+      shopName,
+      openingBalance,
+      recoveryAmount,
+      remainingBalance,
+    });
+  }, [phoneInputShop, user, lastRecoveryInfo]);
+
   // Feature 13: Handle reminder shop press
   const handleReminderShopPress = useCallback((shopId: string) => {
     const shop = todayShops.find((s) => s.id === shopId);
@@ -412,6 +464,15 @@ export default function TodayRouteScreen() {
       if (allShop) setDetailShop(allShop);
     }
   }, [todayShops, allShops]);
+
+  // Open recovery sheet with duplicate check
+  const handleOpenRecovery = useCallback((shop: Shop) => {
+    if (recoverySubmittedShopIds.has(shop.id)) {
+      Alert.alert('Already Recovered', `Recovery for ${shop.name} has already been submitted today. You cannot submit duplicate recovery.`);
+      return;
+    }
+    setRecoveryShop(shop);
+  }, [recoverySubmittedShopIds]);
 
   // ── Filtered shops (search) ──────────────────────────────────────────────
   const filteredShops = useMemo(() => {
@@ -757,7 +818,8 @@ export default function TodayRouteScreen() {
                 <ShopCard
                   shop={item.shop}
                   isVisited={visitedShopIds.has(item.shop.id)}
-                  onCollect={() => setRecoveryShop(item.shop)}
+                  hasRecovery={recoverySubmittedShopIds.has(item.shop.id)}
+                  onCollect={() => handleOpenRecovery(item.shop)}
                   onPress={() => setDetailShop(item.shop)}
                   onGpsVisit={() => setGpsVisitShop(item.shop)}
                   companyId={user?.companyId}
@@ -991,7 +1053,8 @@ export default function TodayRouteScreen() {
             <ShopCard
               shop={item}
               isVisited={visitedShopIds.has(item.id)}
-              onCollect={() => setRecoveryShop(item)}
+              hasRecovery={recoverySubmittedShopIds.has(item.id)}
+              onCollect={() => handleOpenRecovery(item)}
               onPress={() => setDetailShop(item)}
               onGpsVisit={() => setGpsVisitShop(item)}
               companyId={user?.companyId}
@@ -1023,9 +1086,21 @@ export default function TodayRouteScreen() {
         companyId={user?.companyId}
         onClose={() => setDetailShop(null)}
         onCollect={() => {
+          if (detailShop && recoverySubmittedShopIds.has(detailShop.id)) {
+            Alert.alert('Already Recovered', `Recovery for ${detailShop.name} has already been submitted today.`);
+            return;
+          }
           setRecoveryShop(detailShop);
           setDetailShop(null);
         }}
+      />
+
+      {/* Phone Input Modal - shows when shop has no phone after recovery */}
+      <PhoneInputModal
+        visible={phoneInputShop !== null}
+        shop={phoneInputShop}
+        onPhoneSaved={handlePhoneSaved}
+        onSkip={() => setPhoneInputShop(null)}
       />
 
       <SuccessOverlay

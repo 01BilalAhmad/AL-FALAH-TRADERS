@@ -20,6 +20,7 @@ export function getShopDisplayBalance(shop: Shop, companyId?: string): { balance
 interface ShopCardProps {
   shop: Shop;
   isVisited: boolean;
+  hasRecovery?: boolean; // Whether recovery has been submitted for this shop today
   onCollect: () => void;
   onPress: () => void;
   onGpsVisit?: () => void;
@@ -29,6 +30,7 @@ interface ShopCardProps {
 export const ShopCard = memo(function ShopCard({
   shop,
   isVisited,
+  hasRecovery = false,
   onCollect,
   onPress,
   onGpsVisit,
@@ -41,6 +43,9 @@ export const ShopCard = memo(function ShopCard({
   const isApproachingLimit = !isOverLimit && rawUtilisation >= 90;
   const isZeroBalance = displayBalance === 0;
   const barColor = isOverLimit ? Colors.danger : rawUtilisation >= 90 ? Colors.secondary : utilisation > 80 ? Colors.secondary : Colors.primary;
+
+  // Recovery submitted = blue accent, visited (GPS only) = lighter blue
+  const showRecoveryAccent = hasRecovery;
 
   // Pulsing dot animation for 90%+ utilization
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -73,19 +78,30 @@ export const ShopCard = memo(function ShopCard({
     <Pressable
       style={({ pressed }) => [
         styles.card,
-        isVisited && styles.cardVisited,
-        isZeroBalance && styles.cardZeroBalance,
+        showRecoveryAccent && styles.cardRecoverySubmitted,
+        isVisited && !showRecoveryAccent && styles.cardVisited,
+        isZeroBalance && !showRecoveryAccent && styles.cardZeroBalance,
         pressed && styles.cardPressed,
       ]}
       onPress={onPress}
     >
-      {/* Visited indicator - blue left stripe */}
-      {isVisited && <View style={styles.visitedStripe} />}
+      {/* Recovery submitted indicator - blue left stripe */}
+      {showRecoveryAccent && <View style={styles.recoveryStripe} />}
+      {/* Visited indicator - lighter blue stripe (only if no recovery) */}
+      {isVisited && !showRecoveryAccent && <View style={styles.visitedStripe} />}
 
       {/* Top row: Avatar + Info + Balance */}
       <View style={styles.topRow}>
-        <View style={[styles.shopAvatar, isVisited && styles.shopAvatarVisited]}>
-          <Text style={[styles.shopAvatarText, isVisited && styles.shopAvatarTextVisited]}>
+        <View style={[
+          styles.shopAvatar,
+          showRecoveryAccent && styles.shopAvatarRecovery,
+          isVisited && !showRecoveryAccent && styles.shopAvatarVisited,
+        ]}>
+          <Text style={[
+            styles.shopAvatarText,
+            showRecoveryAccent && styles.shopAvatarTextRecovery,
+            isVisited && !showRecoveryAccent && styles.shopAvatarTextVisited,
+          ]}>
             {shop.name.charAt(0).toUpperCase()}
           </Text>
         </View>
@@ -99,7 +115,12 @@ export const ShopCard = memo(function ShopCard({
           <Text style={[styles.balance, { color: displayBalance > 0 ? Colors.danger : Colors.success }]}>
             {formatPKR(displayBalance)}
           </Text>
-          {isVisited ? (
+          {showRecoveryAccent ? (
+            <View style={styles.recoveryBadge}>
+              <MaterialIcons name="check-circle" size={11} color="#FFFFFF" />
+              <Text style={styles.recoveryBadgeText}>Recovery Added</Text>
+            </View>
+          ) : isVisited ? (
             <View style={styles.visitedBadge}>
               <MaterialIcons name="check-circle" size={11} color={Colors.primary} />
               <Text style={styles.visitedText}>Visited</Text>
@@ -143,21 +164,29 @@ export const ShopCard = memo(function ShopCard({
 
       {/* Actions */}
       <View style={styles.actions}>
-        <Pressable
-          style={({ pressed }) => [
-            styles.collectBtn,
-            isZeroBalance && styles.collectBtnDisabled,
-            pressed && !isZeroBalance && styles.collectBtnPressed,
-          ]}
-          onPress={onCollect}
-          hitSlop={4}
-          disabled={isZeroBalance}
-        >
-          <MaterialIcons name="payments" size={16} color={isZeroBalance ? Colors.textMuted : Colors.textInverse} />
-          <Text style={[styles.collectBtnText, isZeroBalance && { color: Colors.textMuted }]}>
-            {isZeroBalance ? 'No Balance' : 'Collect Recovery'}
-          </Text>
-        </Pressable>
+        {hasRecovery ? (
+          // Already recovered today - show disabled button
+          <View style={styles.recoveryDoneBtn}>
+            <MaterialIcons name="check" size={16} color="#FFFFFF" />
+            <Text style={styles.recoveryDoneBtnText}>Recovery Added</Text>
+          </View>
+        ) : (
+          <Pressable
+            style={({ pressed }) => [
+              styles.collectBtn,
+              isZeroBalance && styles.collectBtnDisabled,
+              pressed && !isZeroBalance && styles.collectBtnPressed,
+            ]}
+            onPress={onCollect}
+            hitSlop={4}
+            disabled={isZeroBalance}
+          >
+            <MaterialIcons name="payments" size={16} color={isZeroBalance ? Colors.textMuted : Colors.textInverse} />
+            <Text style={[styles.collectBtnText, isZeroBalance && { color: Colors.textMuted }]}>
+              {isZeroBalance ? 'No Balance' : 'Collect Recovery'}
+            </Text>
+          </Pressable>
+        )}
         <Pressable
           style={({ pressed }) => [styles.gpsBtn, isVisited && styles.gpsBtnVisited, pressed && styles.gpsBtnPressed]}
           onPress={onGpsVisit}
@@ -200,6 +229,12 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     position: 'relative',
   },
+  // Recovery submitted - blue accent card
+  cardRecoverySubmitted: {
+    borderColor: '#2563EB',
+    borderWidth: 1.5,
+    backgroundColor: '#F0F7FF',
+  },
   cardVisited: {
     borderColor: Colors.primary,
     borderWidth: 1.5,
@@ -209,6 +244,17 @@ const styles = StyleSheet.create({
     opacity: 0.75,
   },
   cardPressed: { opacity: 0.94, transform: [{ scale: 0.99 }] },
+  // Recovery submitted stripe - prominent blue
+  recoveryStripe: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 5,
+    backgroundColor: '#2563EB',
+    borderTopLeftRadius: Radius.lg,
+    borderBottomLeftRadius: Radius.lg,
+  },
   visitedStripe: {
     position: 'absolute',
     left: 0,
@@ -234,6 +280,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  shopAvatarRecovery: {
+    backgroundColor: '#2563EB',
+  },
   shopAvatarVisited: {
     backgroundColor: Colors.primary,
   },
@@ -241,6 +290,9 @@ const styles = StyleSheet.create({
     fontSize: FontSize.lg,
     fontWeight: FontWeight.bold,
     color: Colors.primaryDark,
+  },
+  shopAvatarTextRecovery: {
+    color: '#FFFFFF',
   },
   shopAvatarTextVisited: {
     color: Colors.textInverse,
@@ -264,6 +316,21 @@ const styles = StyleSheet.create({
   },
   balance: {
     fontSize: FontSize.md,
+    fontWeight: FontWeight.bold,
+  },
+  // Recovery submitted badge - blue filled
+  recoveryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#2563EB',
+    borderRadius: Radius.full,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  recoveryBadgeText: {
+    fontSize: 10,
+    color: '#FFFFFF',
     fontWeight: FontWeight.bold,
   },
   visitedBadge: {
@@ -377,6 +444,23 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
     marginTop: 2,
     marginLeft: 2,
+  },
+  // Recovery already done - blue filled button
+  recoveryDoneBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#2563EB',
+    borderRadius: Radius.sm,
+    paddingVertical: 10,
+    paddingHorizontal: Spacing.sm,
+  },
+  recoveryDoneBtnText: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semibold,
+    color: '#FFFFFF',
   },
   collectBtn: {
     flex: 1,

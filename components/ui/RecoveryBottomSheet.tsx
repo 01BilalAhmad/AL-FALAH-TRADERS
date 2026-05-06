@@ -266,11 +266,37 @@ export function RecoveryBottomSheet({
         Alert.alert('Permission Denied', 'Location permission is required to capture GPS.');
         return;
       }
-      // Use Balanced accuracy for better offline support
-      const loc = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-        timeInterval: 10000,
-      });
+
+      let loc: Location.LocationObject | null = null;
+
+      // Try with Balanced accuracy first, then fall back to Low for better offline support
+      for (const accuracy of [Location.Accuracy.Balanced, Location.Accuracy.Low]) {
+        try {
+          loc = await Location.getCurrentPositionAsync({
+            accuracy,
+            timeInterval: 15000,
+          });
+          break; // success — exit loop
+        } catch (e) {
+          console.warn(`[GPS] Failed with accuracy ${accuracy}, retrying...`, e);
+        }
+      }
+
+      if (!loc) {
+        // Final fallback: try getting last known position
+        try {
+          const lastKnown = await Location.getLastKnownPositionAsync();
+          if (lastKnown) {
+            loc = lastKnown;
+          }
+        } catch { /* ignore */ }
+      }
+
+      if (!loc) {
+        Alert.alert('GPS Error', 'Could not get location. Please ensure GPS is enabled and you are outdoors, then try again.');
+        return;
+      }
+
       setGpsLat(loc.coords.latitude);
       setGpsLng(loc.coords.longitude);
       setMapLoading(true);

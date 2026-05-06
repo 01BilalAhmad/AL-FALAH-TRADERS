@@ -142,15 +142,44 @@ export function GpsVisitBottomSheet({
         setVisitState('idle');
         return;
       }
-      // Use Balanced accuracy for better offline support + longer timeout
-      const loc = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-        timeInterval: 10000,
-      });
+
+      let loc: Location.LocationObject | null = null;
+
+      // Try with Balanced accuracy first, then fall back to Low
+      for (const accuracy of [Location.Accuracy.Balanced, Location.Accuracy.Low]) {
+        try {
+          loc = await Location.getCurrentPositionAsync({
+            accuracy,
+            timeInterval: 15000,
+          });
+          break; // success — exit loop
+        } catch (e) {
+          console.warn(`[GPS] Failed with accuracy ${accuracy}, retrying...`, e);
+        }
+      }
+
+      if (!loc) {
+        // Final fallback: try getting last known position
+        try {
+          const lastKnown = await Location.getLastKnownPositionAsync();
+          if (lastKnown) {
+            loc = lastKnown;
+          }
+        } catch { /* ignore */ }
+      }
+
+      if (!loc) {
+        Alert.alert('GPS Error', 'Could not get location. Please ensure GPS is enabled and you are outdoors, then try again.');
+        setVisitState('idle');
+        return;
+      }
+
       setGpsLat(loc.coords.latitude);
       setGpsLng(loc.coords.longitude);
       setMapLoading(true);
+
       // Reverse geocoding is optional — may fail offline
+      let address = '';
       try {
         const [geo] = await Location.reverseGeocodeAsync({
           latitude: loc.coords.latitude,
@@ -158,15 +187,17 @@ export function GpsVisitBottomSheet({
         });
         if (geo) {
           const parts = [geo.street, geo.district, geo.city].filter(Boolean);
-          setGpsAddress(parts.join(', '));
+          address = parts.join(', ');
+          setGpsAddress(address);
         }
       } catch {
         // Offline: skip address, coordinates are enough
         setGpsAddress(undefined);
       }
+
       setVisitState('success');
       if (shop) {
-        onVisitMarked(shop.id, loc.coords.latitude, loc.coords.longitude, gpsAddress || '');
+        onVisitMarked(shop.id, loc.coords.latitude, loc.coords.longitude, address);
       }
     } catch {
       Alert.alert('GPS Error', 'Could not get location. Make sure GPS is enabled and try again.');
