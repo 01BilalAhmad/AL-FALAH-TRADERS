@@ -342,7 +342,7 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: Radius.xl,
     padding: 24,
-    backgroundColor: '#047857',
+    backgroundColor: '#1D4ED8',
     overflow: 'hidden',
     ...Shadow.lg,
   },
@@ -615,7 +615,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: Spacing.sm,
     paddingVertical: 16,
-    backgroundColor: '#047857',
+    backgroundColor: '#1D4ED8',
   },
   shareBtnInnerDisabled: {
     backgroundColor: '#4B5563',

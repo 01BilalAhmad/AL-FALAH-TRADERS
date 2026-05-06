@@ -433,7 +433,7 @@ export const ShopDetailModal = memo(function ShopDetailModal({
                     datasets: [
                       {
                         data: chartData.recoveries.map((v) => Math.max(v, 0)),
-                        color: (opacity = 1) => `rgba(5, 150, 105, ${opacity})`,
+                        color: (opacity = 1) => `rgba(37, 99, 235, ${opacity})`,
                       },
                     ],
                   }}
@@ -446,7 +446,7 @@ export const ShopDetailModal = memo(function ShopDetailModal({
                     backgroundGradientFrom: Colors.surface,
                     backgroundGradientTo: Colors.surface,
                     decimalPlaces: 0,
-                    color: (opacity = 1) => `rgba(5, 150, 105, ${opacity})`,
+                    color: (opacity = 1) => `rgba(37, 99, 235, ${opacity})`,
                     labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
                     barPercentage: 0.7,
                     propsForBackgroundLines: {

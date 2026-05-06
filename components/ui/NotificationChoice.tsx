@@ -407,7 +407,7 @@ const styles = StyleSheet.create({
     width: 340,
     borderRadius: Radius.xl,
     padding: 24,
-    backgroundColor: '#047857',
+    backgroundColor: '#1D4ED8',
     overflow: 'hidden',
   },
   receiptGradientOverlay: {

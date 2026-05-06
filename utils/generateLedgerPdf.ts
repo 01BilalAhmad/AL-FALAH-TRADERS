@@ -12,8 +12,8 @@ function generateLedgerHtml(data: LedgerResponse): string {
   const txnRows = transactions
     .map((t) => {
       const isCredit = t.type === 'credit';
-      const bgColor = isCredit ? '#FEF3C7' : '#D1FAE5';
-      const typeColor = isCredit ? '#92400E' : '#047857';
+      const bgColor = isCredit ? '#FEF3C7' : '#DBEAFE';
+      const typeColor = isCredit ? '#92400E' : '#1D4ED8';
       const typeLabel = isCredit ? 'CREDIT' : 'RECOVERY';
       const amountPrefix = isCredit ? '+' : '-';
       const statusBadge =
@@ -31,7 +31,7 @@ function generateLedgerHtml(data: LedgerResponse): string {
             ${statusBadge}
           </td>
           <td style="padding:10px 8px;border-bottom:1px solid #E5E7EB;font-size:12px;color:#374151;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${t.description || '—'}</td>
-          <td style="padding:10px 8px;border-bottom:1px solid #E5E7EB;font-size:13px;font-weight:700;color:${isCredit ? '#F59E0B' : '#059669'};text-align:right;">${amountPrefix} ${formatPKR(t.amount)}</td>
+          <td style="padding:10px 8px;border-bottom:1px solid #E5E7EB;font-size:13px;font-weight:700;color:${isCredit ? '#F59E0B' : '#2563EB'};text-align:right;">${amountPrefix} ${formatPKR(t.amount)}</td>
           <td style="padding:10px 8px;border-bottom:1px solid #E5E7EB;font-size:12px;color:#6B7280;text-align:right;">${formatPKR(t.previousBalance)}</td>
           <td style="padding:10px 8px;border-bottom:1px solid #E5E7EB;font-size:12px;font-weight:600;color:#111827;text-align:right;">${formatPKR(t.newBalance)}</td>
         </tr>
@@ -39,7 +39,7 @@ function generateLedgerHtml(data: LedgerResponse): string {
     })
     .join('');
 
-  const balanceColor = summary.currentBalance > 0 ? '#EF4444' : '#059669';
+  const balanceColor = summary.currentBalance > 0 ? '#EF4444' : '#2563EB';
   const generatedDate = new Date().toLocaleDateString('en-PK', {
     day: '2-digit',
     month: 'long',
@@ -60,7 +60,7 @@ function generateLedgerHtml(data: LedgerResponse): string {
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #111827; background: #fff; }
         .page { padding: 24px; max-width: 800px; margin: 0 auto; }
-        .header { background: linear-gradient(135deg, #059669, #065F46); color: white; padding: 24px; border-radius: 12px; margin-bottom: 20px; }
+        .header { background: linear-gradient(135deg, #2563EB, #1E40AF); color: white; padding: 24px; border-radius: 12px; margin-bottom: 20px; }
         .header h1 { font-size: 22px; margin-bottom: 4px; }
         .header p { opacity: 0.8; font-size: 13px; }
         .shop-info { background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 10px; padding: 16px; margin-bottom: 20px; }
@@ -72,7 +72,7 @@ function generateLedgerHtml(data: LedgerResponse): string {
         .summary-card .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: #9CA3AF; margin-bottom: 4px; font-weight: 600; }
         .summary-card .value { font-size: 16px; font-weight: 700; }
         .section-title { font-size: 15px; font-weight: 700; margin-bottom: 12px; color: #111827; display: flex; align-items: center; gap: 8px; }
-        .section-title .count { background: #059669; color: white; font-size: 11px; padding: 2px 8px; border-radius: 12px; }
+        .section-title .count { background: #2563EB; color: white; font-size: 11px; padding: 2px 8px; border-radius: 12px; }
         table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
         th { background: #F3F4F6; padding: 8px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: #6B7280; font-weight: 600; text-align: left; }
         th:last-child, th:nth-child(4), th:nth-child(5), th:nth-child(6) { text-align: right; }
@@ -104,11 +104,11 @@ function generateLedgerHtml(data: LedgerResponse): string {
             <div class="label">Total Credit</div>
             <div class="value" style="color:#F59E0B;">${formatPKR(summary.totalCredit)}</div>
           </div>
-          <div class="summary-card" style="background:#D1FAE5;">
+          <div class="summary-card" style="background:#DBEAFE;">
             <div class="label">Total Recovery</div>
-            <div class="value" style="color:#059669;">${formatPKR(summary.totalRecovery)}</div>
+            <div class="value" style="color:#2563EB;">${formatPKR(summary.totalRecovery)}</div>
           </div>
-          <div class="summary-card" style="background:${summary.currentBalance > 0 ? '#FEE2E2' : '#D1FAE5'};">
+          <div class="summary-card" style="background:${summary.currentBalance > 0 ? '#FEE2E2' : '#DBEAFE'};">
             <div class="label">Balance</div>
             <div class="value" style="color:${balanceColor};">${formatPKR(summary.currentBalance)}</div>
           </div>

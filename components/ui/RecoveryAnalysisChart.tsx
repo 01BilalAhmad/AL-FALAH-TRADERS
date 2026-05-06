@@ -180,7 +180,7 @@ export const RecoveryAnalysisChart = memo(function RecoveryAnalysisChart({
     <View style={styles.wrapper}>
       {/* Header */}
       <LinearGradient
-        colors={['#064E3B', '#065F46']}
+        colors={['#064E3B', '#1E40AF']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={styles.headerGradient}

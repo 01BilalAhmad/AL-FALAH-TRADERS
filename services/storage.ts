@@ -17,6 +17,7 @@ const KEYS = {
   VISIT_STREAKS: 'af_visit_streaks',
   TODAY_RECOVERY: 'af_today_recovery',
   NOTIF_COUNTS: 'af_notif_counts',
+  VISITED_SHOPS: 'af_visited_shops',
 };
 
 export interface PendingNotification {
@@ -415,5 +416,42 @@ export const StorageService = {
     } catch {
       return { sms: 0, whatsapp: 0 };
     }
+  },
+
+  // --- Visited Shops (persists across page refreshes, resets daily) ---
+  saveVisitedShops: async (shopIds: string[]) => {
+    const entry = { date: getTodayDateStr(), shopIds };
+    await AsyncStorage.setItem(KEYS.VISITED_SHOPS, JSON.stringify(entry));
+  },
+
+  getVisitedShops: async (): Promise<string[]> => {
+    try {
+      const raw = await AsyncStorage.getItem(KEYS.VISITED_SHOPS);
+      if (!raw) return [];
+      const entry = JSON.parse(raw);
+      // Only return if from today, otherwise reset
+      return entry.date === getTodayDateStr() ? entry.shopIds || [] : [];
+    } catch {
+      return [];
+    }
+  },
+
+  addVisitedShop: async (shopId: string) => {
+    try {
+      const raw = await AsyncStorage.getItem(KEYS.VISITED_SHOPS);
+      let entry: { date: string; shopIds: string[] };
+      if (!raw) {
+        entry = { date: getTodayDateStr(), shopIds: [] };
+      } else {
+        entry = JSON.parse(raw);
+        if (entry.date !== getTodayDateStr()) {
+          entry = { date: getTodayDateStr(), shopIds: [] };
+        }
+      }
+      if (!entry.shopIds.includes(shopId)) {
+        entry.shopIds.push(shopId);
+        await AsyncStorage.setItem(KEYS.VISITED_SHOPS, JSON.stringify(entry));
+      }
+    } catch { /* non-critical */ }
   },
 };

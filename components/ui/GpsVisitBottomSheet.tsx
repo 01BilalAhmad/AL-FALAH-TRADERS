@@ -142,24 +142,34 @@ export function GpsVisitBottomSheet({
         setVisitState('idle');
         return;
       }
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      // Use Balanced accuracy for better offline support + longer timeout
+      const loc = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+        timeInterval: 10000,
+      });
       setGpsLat(loc.coords.latitude);
       setGpsLng(loc.coords.longitude);
       setMapLoading(true);
-      const [geo] = await Location.reverseGeocodeAsync({
-        latitude: loc.coords.latitude,
-        longitude: loc.coords.longitude,
-      });
-      if (geo) {
-        const parts = [geo.street, geo.district, geo.city].filter(Boolean);
-        setGpsAddress(parts.join(', '));
+      // Reverse geocoding is optional — may fail offline
+      try {
+        const [geo] = await Location.reverseGeocodeAsync({
+          latitude: loc.coords.latitude,
+          longitude: loc.coords.longitude,
+        });
+        if (geo) {
+          const parts = [geo.street, geo.district, geo.city].filter(Boolean);
+          setGpsAddress(parts.join(', '));
+        }
+      } catch {
+        // Offline: skip address, coordinates are enough
+        setGpsAddress(undefined);
       }
       setVisitState('success');
       if (shop) {
         onVisitMarked(shop.id, loc.coords.latitude, loc.coords.longitude, gpsAddress || '');
       }
     } catch {
-      Alert.alert('GPS Error', 'Could not get location. Please try again.');
+      Alert.alert('GPS Error', 'Could not get location. Make sure GPS is enabled and try again.');
       setVisitState('idle');
     }
   };
@@ -179,7 +189,7 @@ export function GpsVisitBottomSheet({
           <View style={styles.handle} />
 
           <LinearGradient
-            colors={['#059669', '#047857', '#065F46']}
+            colors={['#2563EB', '#1D4ED8', '#1E40AF']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.headerGradient}
@@ -415,14 +425,14 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: 'rgba(5, 150, 105, 0.1)',
+    backgroundColor: 'rgba(37, 99, 235, 0.1)',
   },
   capturingInner: {
     position: 'absolute',
     width: 70,
     height: 70,
     borderRadius: 35,
-    backgroundColor: 'rgba(5, 150, 105, 0.15)',
+    backgroundColor: 'rgba(37, 99, 235, 0.15)',
   },
   capturingTitle: {
     fontSize: FontSize.lg,
@@ -485,7 +495,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(5, 150, 105, 0.85)',
+    backgroundColor: 'rgba(37, 99, 235, 0.85)',
     borderRadius: Radius.full,
     paddingHorizontal: 10,
     paddingVertical: 4,

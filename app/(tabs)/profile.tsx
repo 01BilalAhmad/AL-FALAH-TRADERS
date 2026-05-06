@@ -196,7 +196,7 @@ export default function ProfileScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         {/* Hero profile card */}
         <LinearGradient
-          colors={['#059669', '#065F46']}
+          colors={['#2563EB', '#1E40AF']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.profileHero}

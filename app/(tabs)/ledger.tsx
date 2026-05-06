@@ -232,7 +232,7 @@ export default function LedgerScreen() {
     <View style={[styles.root, { paddingTop: insets.top }]}>
       {/* Gradient header */}
       <LinearGradient
-        colors={['#059669', '#065F46']}
+        colors={['#2563EB', '#1E40AF']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={styles.header}

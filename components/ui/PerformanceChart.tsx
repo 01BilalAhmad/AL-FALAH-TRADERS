@@ -117,7 +117,7 @@ export const PerformanceChart = memo(function PerformanceChart({ userId }: Perfo
     <View style={styles.card}>
       {/* Gradient header strip */}
       <LinearGradient
-        colors={['#059669', '#10B981']}
+        colors={['#2563EB', '#10B981']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={styles.headerStrip}
@@ -201,7 +201,7 @@ export const PerformanceChart = memo(function PerformanceChart({ userId }: Perfo
               backgroundGradientFromOpacity: 0,
               backgroundGradientToOpacity: 0,
               decimalPlaces: 0,
-              color: (opacity = 1) => `rgba(5, 150, 105, ${opacity})`,
+              color: (opacity = 1) => `rgba(37, 99, 235, ${opacity})`,
               labelColor: () => Colors.textMuted,
               style: { borderRadius: 8 },
               propsForDots: {

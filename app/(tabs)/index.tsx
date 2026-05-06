@@ -89,6 +89,10 @@ export default function TodayRouteScreen() {
     StorageService.getTodayRecovery().then((cached) => {
       if (cached > 0) setTodayRecovery(cached);
     });
+    // Load cached visited shops so they persist across app refreshes
+    StorageService.getVisitedShops().then((cached) => {
+      if (cached.length > 0) setVisitedShopIds(new Set(cached));
+    });
     // Load cached notification counts so they persist across app refreshes
     StorageService.getNotifCounts().then((counts) => {
       if (counts.sms > 0) setSmsSentCount(counts.sms);
@@ -159,7 +163,12 @@ export default function TodayRouteScreen() {
         const visited = new Set(
           myEntry.shops.filter((s) => s.visited).map((s) => s.shopId)
         );
-        setVisitedShopIds(visited);
+        // Merge API visited with locally tracked visited (local takes precedence)
+        setVisitedShopIds((prev) => {
+          const merged = new Set([...prev, ...visited]);
+          StorageService.saveVisitedShops([...merged]);
+          return merged;
+        });
       }
       // If myEntry not found, don't reset — keep cached value
     } catch {
@@ -220,6 +229,7 @@ export default function TodayRouteScreen() {
           idempotencyKey,
         });
         setVisitedShopIds((prev) => new Set([...prev, shopId]));
+        StorageService.addVisitedShop(shopId);
         setTodayRecovery((prev) => {
           const newTotal = prev + payload.amount;
           StorageService.saveTodayRecovery(newTotal);
@@ -303,6 +313,7 @@ export default function TodayRouteScreen() {
         });
         if (payload.markGpsVisit) {
           setVisitedShopIds((prev) => new Set([...prev, shopId]));
+        StorageService.addVisitedShop(shopId);
         }
         // Increment todayRecovery for offline recoveries too
         setTodayRecovery((prev) => {
@@ -326,6 +337,7 @@ export default function TodayRouteScreen() {
 
   const handleGpsVisitMarked = async (shopId: string, gpsLat: number, gpsLng: number, address: string) => {
     setVisitedShopIds((prev) => new Set([...prev, shopId]));
+    StorageService.addVisitedShop(shopId);
     // Create a ShopVisit record on the server so admin map can show the location
     if (user && isOnline) {
       try {
@@ -357,6 +369,7 @@ export default function TodayRouteScreen() {
       setVisitedShopIds((prev) => {
         const next = new Set(prev);
         next.delete(shopId);
+        StorageService.saveVisitedShops([...next]);
         return next;
       });
 
@@ -511,7 +524,7 @@ export default function TodayRouteScreen() {
             <View>
               {/* Hero Card - All Routes */}
               <LinearGradient
-                colors={['#059669', '#065F46']}
+                colors={['#2563EB', '#1E40AF']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.heroCard}
@@ -772,7 +785,7 @@ export default function TodayRouteScreen() {
             <View>
               {/* Hero Card - Normal */}
               <LinearGradient
-                colors={['#059669', '#065F46']}
+                colors={['#2563EB', '#1E40AF']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.heroCard}

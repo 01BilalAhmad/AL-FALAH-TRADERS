@@ -1,4 +1,4 @@
-// Powered by OnSpace.AI
+// Al FALAH Credit System
 import React, { memo, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable, Linking, Animated } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -39,6 +39,7 @@ export const ShopCard = memo(function ShopCard({
   const rawUtilisation = displayCreditLimit > 0 ? (displayBalance / displayCreditLimit) * 100 : 0;
   const utilisation = Math.min(rawUtilisation, 100);
   const isApproachingLimit = !isOverLimit && rawUtilisation >= 90;
+  const isZeroBalance = displayBalance === 0;
   const barColor = isOverLimit ? Colors.danger : rawUtilisation >= 90 ? Colors.secondary : utilisation > 80 ? Colors.secondary : Colors.primary;
 
   // Pulsing dot animation for 90%+ utilization
@@ -70,13 +71,23 @@ export const ShopCard = memo(function ShopCard({
 
   return (
     <Pressable
-      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      style={({ pressed }) => [
+        styles.card,
+        isVisited && styles.cardVisited,
+        isZeroBalance && styles.cardZeroBalance,
+        pressed && styles.cardPressed,
+      ]}
       onPress={onPress}
     >
+      {/* Visited indicator - blue left stripe */}
+      {isVisited && <View style={styles.visitedStripe} />}
+
       {/* Top row: Avatar + Info + Balance */}
       <View style={styles.topRow}>
-        <View style={styles.shopAvatar}>
-          <Text style={styles.shopAvatarText}>{shop.name.charAt(0).toUpperCase()}</Text>
+        <View style={[styles.shopAvatar, isVisited && styles.shopAvatarVisited]}>
+          <Text style={[styles.shopAvatarText, isVisited && styles.shopAvatarTextVisited]}>
+            {shop.name.charAt(0).toUpperCase()}
+          </Text>
         </View>
         <View style={styles.shopInfo}>
           <Text style={styles.shopName} numberOfLines={1}>{shop.name}</Text>
@@ -85,7 +96,7 @@ export const ShopCard = memo(function ShopCard({
           </Text>
         </View>
         <View style={styles.balanceCol}>
-          <Text style={[styles.balance, { color: displayBalance > 0 ? Colors.danger : Colors.primary }]}>
+          <Text style={[styles.balance, { color: displayBalance > 0 ? Colors.danger : Colors.success }]}>
             {formatPKR(displayBalance)}
           </Text>
           {isVisited ? (
@@ -110,6 +121,11 @@ export const ShopCard = memo(function ShopCard({
           <MaterialIcons name="warning" size={13} color={Colors.secondary} />
           <Text style={styles.approachingLimitText}>Credit utilization at 90% — approaching limit</Text>
         </View>
+      ) : isZeroBalance ? (
+        <View style={styles.zeroBalanceBanner}>
+          <MaterialIcons name="check-circle" size={13} color={Colors.success} />
+          <Text style={styles.zeroBalanceText}>Balance Clear</Text>
+        </View>
       ) : null}
 
       {/* Credit utilisation bar */}
@@ -128,12 +144,19 @@ export const ShopCard = memo(function ShopCard({
       {/* Actions */}
       <View style={styles.actions}>
         <Pressable
-          style={({ pressed }) => [styles.collectBtn, pressed && styles.collectBtnPressed]}
+          style={({ pressed }) => [
+            styles.collectBtn,
+            isZeroBalance && styles.collectBtnDisabled,
+            pressed && !isZeroBalance && styles.collectBtnPressed,
+          ]}
           onPress={onCollect}
           hitSlop={4}
+          disabled={isZeroBalance}
         >
-          <MaterialIcons name="payments" size={16} color={Colors.textInverse} />
-          <Text style={styles.collectBtnText}>Collect Recovery</Text>
+          <MaterialIcons name="payments" size={16} color={isZeroBalance ? Colors.textMuted : Colors.textInverse} />
+          <Text style={[styles.collectBtnText, isZeroBalance && { color: Colors.textMuted }]}>
+            {isZeroBalance ? 'No Balance' : 'Collect Recovery'}
+          </Text>
         </Pressable>
         <Pressable
           style={({ pressed }) => [styles.gpsBtn, isVisited && styles.gpsBtnVisited, pressed && styles.gpsBtnPressed]}
@@ -143,7 +166,7 @@ export const ShopCard = memo(function ShopCard({
           <MaterialIcons
             name={isVisited ? 'check-circle' : 'my-location'}
             size={18}
-            color={isVisited ? Colors.primary : '#2563EB'}
+            color={isVisited ? Colors.primary : Colors.blue}
           />
         </Pressable>
         <Pressable
@@ -174,13 +197,34 @@ const styles = StyleSheet.create({
     ...Shadow.md,
     borderWidth: 1,
     borderColor: Colors.borderLight,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  cardVisited: {
+    borderColor: Colors.primary,
+    borderWidth: 1.5,
+    backgroundColor: '#FAFBFF',
+  },
+  cardZeroBalance: {
+    opacity: 0.75,
   },
   cardPressed: { opacity: 0.94, transform: [{ scale: 0.99 }] },
+  visitedStripe: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    backgroundColor: Colors.primary,
+    borderTopLeftRadius: Radius.lg,
+    borderBottomLeftRadius: Radius.lg,
+  },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
     marginBottom: Spacing.sm,
+    paddingLeft: 2,
   },
   shopAvatar: {
     width: 44,
@@ -190,10 +234,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  shopAvatarVisited: {
+    backgroundColor: Colors.primary,
+  },
   shopAvatarText: {
     fontSize: FontSize.lg,
     fontWeight: FontWeight.bold,
     color: Colors.primaryDark,
+  },
+  shopAvatarTextVisited: {
+    color: Colors.textInverse,
   },
   shopInfo: {
     flex: 1,
@@ -239,6 +289,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm,
     paddingVertical: 4,
     marginBottom: Spacing.xs,
+    marginLeft: 2,
   },
   overLimitText: {
     fontSize: FontSize.xs,
@@ -254,12 +305,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm,
     paddingVertical: 4,
     marginBottom: Spacing.xs,
+    marginLeft: 2,
   },
   approachingLimitText: {
     fontSize: FontSize.xs,
     color: Colors.secondary,
     fontWeight: FontWeight.semibold,
     flex: 1,
+  },
+  zeroBalanceBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: Colors.successLight,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    marginBottom: Spacing.xs,
+    marginLeft: 2,
+  },
+  zeroBalanceText: {
+    fontSize: FontSize.xs,
+    color: Colors.success,
+    fontWeight: FontWeight.semibold,
   },
   pulseDot: {
     width: 8,
@@ -278,6 +346,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.sm,
     marginBottom: 3,
+    marginLeft: 2,
   },
   creditTrack: {
     flex: 1,
@@ -300,12 +369,14 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     color: Colors.textMuted,
     marginBottom: Spacing.sm,
+    marginLeft: 2,
   },
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
     marginTop: 2,
+    marginLeft: 2,
   },
   collectBtn: {
     flex: 1,
@@ -318,6 +389,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: Spacing.sm,
   },
+  collectBtnDisabled: {
+    backgroundColor: Colors.border,
+  },
   collectBtnPressed: { opacity: 0.85 },
   collectBtnText: {
     fontSize: FontSize.sm,
@@ -329,10 +403,10 @@ const styles = StyleSheet.create({
     height: 42,
     borderRadius: Radius.sm,
     borderWidth: 1.5,
-    borderColor: '#2563EB',
+    borderColor: Colors.blue,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#EFF6FF',
+    backgroundColor: Colors.blueLight,
   },
   gpsBtnVisited: {
     borderColor: Colors.primary,

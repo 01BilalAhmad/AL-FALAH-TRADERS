@@ -81,7 +81,7 @@ const pulseStyles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(5, 150, 105, 0.15)',
+    backgroundColor: 'rgba(37, 99, 235, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -89,7 +89,7 @@ const pulseStyles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: 'rgba(5, 150, 105, 0.3)',
+    backgroundColor: 'rgba(37, 99, 235, 0.3)',
   },
 });
 
@@ -100,7 +100,7 @@ function ConfettiOverlay({ visible }: { visible: boolean }) {
       id: i,
       x: Math.random() * SCREEN_WIDTH,
       delay: Math.random() * 300,
-      color: ['#059669', '#F59E0B', '#EF4444', '#2563EB', '#7C3AED'][i % 5],
+      color: ['#2563EB', '#F59E0B', '#EF4444', '#10B981', '#7C3AED'][i % 5],
       size: 4 + Math.random() * 6,
       rotation: Math.random() * 360,
     }))
@@ -161,7 +161,7 @@ function SuccessCheckmark({ visible }: { visible: boolean }) {
 
   return (
     <Animated.View style={[successStyles.container, { opacity: opacityAnim, transform: [{ scale: scaleAnim }] }]}>
-      <LinearGradient colors={['#059669', '#047857']} style={successStyles.badge}>
+      <LinearGradient colors={['#2563EB', '#1D4ED8']} style={successStyles.badge}>
         <MaterialIcons name="check" size={28} color="#FFFFFF" />
       </LinearGradient>
     </Animated.View>
@@ -266,21 +266,31 @@ export function RecoveryBottomSheet({
         Alert.alert('Permission Denied', 'Location permission is required to capture GPS.');
         return;
       }
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      // Use Balanced accuracy for better offline support
+      const loc = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+        timeInterval: 10000,
+      });
       setGpsLat(loc.coords.latitude);
       setGpsLng(loc.coords.longitude);
       setMapLoading(true);
-      const [geo] = await Location.reverseGeocodeAsync({
-        latitude: loc.coords.latitude,
-        longitude: loc.coords.longitude,
-      });
-      if (geo) {
-        const parts = [geo.street, geo.district, geo.city].filter(Boolean);
-        setGpsAddress(parts.join(', '));
+      // Reverse geocoding is optional — may fail offline
+      try {
+        const [geo] = await Location.reverseGeocodeAsync({
+          latitude: loc.coords.latitude,
+          longitude: loc.coords.longitude,
+        });
+        if (geo) {
+          const parts = [geo.street, geo.district, geo.city].filter(Boolean);
+          setGpsAddress(parts.join(', '));
+        }
+      } catch {
+        // Offline: skip address, coordinates are enough
+        setGpsAddress(undefined);
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {
-      Alert.alert('GPS Error', 'Could not get location. Please try again.');
+      Alert.alert('GPS Error', 'Could not get location. Make sure GPS is enabled and try again.');
     } finally {
       setCapturingGps(false);
     }
@@ -389,7 +399,7 @@ export function RecoveryBottomSheet({
 
           {/* Modern gradient header */}
           <LinearGradient
-            colors={['#059669', '#047857', '#065F46']}
+            colors={['#2563EB', '#1D4ED8', '#1E40AF']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.headerGradient}
@@ -537,7 +547,7 @@ export function RecoveryBottomSheet({
             {numericAmount > 0 && numericAmount <= displayBalance ? (
               <View style={styles.balancePreviewCard}>
                 <LinearGradient
-                  colors={['#ECFDF5', '#D1FAE5']}
+                  colors={['#EFF6FF', '#DBEAFE']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={styles.balancePreviewGradient}
@@ -621,7 +631,7 @@ export function RecoveryBottomSheet({
                     <MaterialIcons
                       name={markGpsVisit ? 'storefront' : 'storefront'}
                       size={22}
-                      color={markGpsVisit ? '#059669' : Colors.textMuted}
+                      color={markGpsVisit ? '#2563EB' : Colors.textMuted}
                     />
                   </View>
                   <View style={styles.gpsVisitTextWrap}>
@@ -801,7 +811,7 @@ export function RecoveryBottomSheet({
 
             {showSuccess ? (
               <View style={styles.successFooter}>
-                <LinearGradient colors={['#059669', '#047857']} style={styles.successFooterInner}>
+                <LinearGradient colors={['#2563EB', '#1D4ED8']} style={styles.successFooterInner}>
                   <MaterialIcons name="check-circle" size={24} color="#FFFFFF" />
                   <Text style={styles.successFooterText}>Recovery Submitted Successfully!</Text>
                 </LinearGradient>
@@ -1043,7 +1053,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(5, 150, 105, 0.1)',
+    backgroundColor: 'rgba(37, 99, 235, 0.1)',
     borderRadius: Radius.full,
     paddingHorizontal: 8,
     paddingVertical: 2,
@@ -1145,7 +1155,7 @@ const styles = StyleSheet.create({
   },
   amountInputFocused: {
     borderColor: Colors.primary,
-    backgroundColor: '#F0FDF9',
+    backgroundColor: '#F0F7FF',
   },
   amountCurrencyTag: {
     backgroundColor: Colors.primary,
@@ -1256,7 +1266,7 @@ const styles = StyleSheet.create({
   },
   reductionBar: {
     height: 4,
-    backgroundColor: 'rgba(5, 150, 105, 0.2)',
+    backgroundColor: 'rgba(37, 99, 235, 0.2)',
     borderRadius: Radius.full,
     overflow: 'hidden',
     marginTop: Spacing.sm,
@@ -1287,7 +1297,7 @@ const styles = StyleSheet.create({
   },
   noteWrapFocused: {
     borderColor: Colors.primary,
-    backgroundColor: '#F0FDF9',
+    backgroundColor: '#F0F7FF',
   },
   noteInput: {
     flex: 1,
@@ -1473,7 +1483,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     borderRadius: Radius.md,
     padding: Spacing.md,
-    backgroundColor: '#ECFDF5',
+    backgroundColor: '#EFF6FF',
   },
   amountPreviewLabel: {
     fontSize: FontSize.sm,

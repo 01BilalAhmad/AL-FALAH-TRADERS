@@ -198,7 +198,7 @@ export function PinLockScreen({ onUnlock, onForceLogout }: PinLockScreenProps) {
   return (
     <View style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <LinearGradient
-        colors={['#059669', '#065F46', '#064E3B']}
+        colors={['#2563EB', '#1E40AF', '#064E3B']}
         start={{ x: 0, y: 0 }}
         end={{ x: 0.3, y: 1 }}
         style={StyleSheet.absoluteFill}

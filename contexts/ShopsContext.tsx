@@ -64,12 +64,12 @@ export function ShopsProvider({ children }: { children: ReactNode }) {
     allRoutesEnabled: boolean,
   ): Promise<Shop[]> => {
     if (allRoutesEnabled) {
-      // All routes mode: fetch ALL shops for this orderbooker
-      return await ApiService.getShops({ orderbookerId: userId });
+      // All routes mode: fetch ALL shops for this orderbooker (including zero balance)
+      return await ApiService.getShops({ orderbookerId: userId, balanceOnly: false });
     } else {
-      // Route-wise mode: fetch only today's route shops
+      // Route-wise mode: fetch only today's route shops (including zero balance)
       const todayDay = getTodayDayName();
-      return await ApiService.getShops({ orderbookerId: userId, routeDay: todayDay });
+      return await ApiService.getShops({ orderbookerId: userId, routeDay: todayDay, balanceOnly: false });
     }
   }, []);
 
@@ -239,7 +239,7 @@ export function ShopsProvider({ children }: { children: ReactNode }) {
   const loadAllShops = useCallback(async (userId: string) => {
     setIsLoadingAll(true);
     try {
-      const shops = await ApiService.getShops({ orderbookerId: userId });
+      const shops = await ApiService.getShops({ orderbookerId: userId, balanceOnly: false });
       setAllShops(shops);
       await StorageService.saveShops(shops);
     } catch {

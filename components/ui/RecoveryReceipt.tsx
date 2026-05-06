@@ -331,7 +331,7 @@ const styles = StyleSheet.create({
   receipt: {
     borderRadius: Radius.xl,
     padding: 24,
-    backgroundColor: '#047857',
+    backgroundColor: '#1D4ED8',
     overflow: 'hidden',
     ...Shadow.lg,
   },

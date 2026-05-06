@@ -150,11 +150,12 @@ export const ApiService = {
       body: JSON.stringify({ userId, currentPassword, newPassword }),
     }),
 
-  getShops: (params: { orderbookerId?: string; routeDay?: string; search?: string }) => {
+  getShops: (params: { orderbookerId?: string; routeDay?: string; search?: string; balanceOnly?: boolean }) => {
     const q = new URLSearchParams();
     if (params.orderbookerId) q.set('orderbookerId', params.orderbookerId);
     if (params.routeDay) q.set('routeDay', params.routeDay);
     if (params.search) q.set('search', params.search);
+    if (params.balanceOnly !== undefined) q.set('balanceOnly', String(params.balanceOnly));
     return request<Shop[]>(`/api/shops?${q.toString()}`);
   },
 
