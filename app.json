@@ -53,17 +53,6 @@
         }
       ],
       "expo-secure-store",
-      [
-        "expo-build-properties",
-        {
-          "android": {
-            "compileSdkVersion": 36,
-            "buildToolsVersion": "36.0.0",
-            "minSdkVersion": 24,
-            "targetSdkVersion": 35
-          }
-        }
-      ],
       "./plugins/withAndroidBuildFix.js"
     ],
     "experiments": {
