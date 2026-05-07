@@ -52,7 +52,18 @@
           "sendSmsPermission": "Allow Al FALAH Credit System to send SMS notifications for recovery updates."
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 36,
+            "buildToolsVersion": "36.0.0",
+            "minSdkVersion": 24,
+            "targetSdkVersion": 35
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
