@@ -1,10 +1,9 @@
 // Config plugin: Fix Android build compatibility
-// 1. Update Android Gradle Plugin version to 8.9.1+ for androidx.activity:activity-ktx:1.11.0
-// 2. Set compileSdkVersion to 36
+// Force androidx.activity:activity to 1.9.x (compatible with AGP 8.8.2)
+// Set compileSdkVersion to 36
 const {
   withAppBuildGradle,
   withProjectBuildGradle,
-  withSettingsGradle,
 } = require('@expo/config-plugins');
 
 /** Update the project-level build.gradle to use AGP 8.9.1 */
@@ -17,7 +16,7 @@ function updateProjectBuildGradle(buildGradle) {
   return buildGradle;
 }
 
-/** Update the app-level build.gradle to use compileSdk 36 */
+/** Update the app-level build.gradle */
 function updateAppBuildGradle(buildGradle) {
   // Update compileSdk
   buildGradle = buildGradle.replace(
@@ -33,21 +32,36 @@ function updateAppBuildGradle(buildGradle) {
     /buildToolsVersion\s*=\s*"[^"]*"/g,
     'buildToolsVersion = "36.0.0"'
   );
-  return buildGradle;
-}
 
-/** Update settings.gradle for AGP plugin version */
-function updateSettingsGradle(settingsGradle) {
-  // Update AGP version in plugins block
-  settingsGradle = settingsGradle.replace(
-    /id\s+"com\.android\.application"\s+version\s+"[\d.]+"/g,
-    'id "com.android.application" version "8.9.1"'
-  );
-  settingsGradle = settingsGradle.replace(
-    /id\s+"com\.android\.library"\s+version\s+"[\d.]+"/g,
-    'id "com.android.library" version "8.9.1"'
-  );
-  return settingsGradle;
+  // Add dependency resolution strategy to force compatible versions
+  const forceDepsBlock = `
+    // Force compatible androidx.activity version for AGP 8.8.2
+    configurations.all {
+      resolutionStrategy {
+        force 'androidx.activity:activity:1.9.3'
+        force 'androidx.activity:activity-ktx:1.9.3'
+      }
+    }
+  `;
+
+  // Only add if not already present
+  if (!buildGradle.includes("force 'androidx.activity:activity:1.9.3'")) {
+    // Add after the android block closing brace
+    buildGradle = buildGradle.replace(
+      /(android\s*\{[\s\S]*?\n\})\s*\n/,
+      `$1\n${forceDepsBlock}\n`
+    );
+
+    // If the above didn't match, try adding before dependencies
+    if (!buildGradle.includes("force 'androidx.activity:activity:1.9.3'")) {
+      buildGradle = buildGradle.replace(
+        /dependencies\s*\{/,
+        `${forceDepsBlock}\ndependencies {`
+      );
+    }
+  }
+
+  return buildGradle;
 }
 
 module.exports = function withAndroidBuildFix(config) {
@@ -60,13 +74,6 @@ module.exports = function withAndroidBuildFix(config) {
 
   config = withAppBuildGradle(config, (modConfig) => {
     modConfig.modResults.contents = updateAppBuildGradle(
-      modConfig.modResults.contents
-    );
-    return modConfig;
-  });
-
-  config = withSettingsGradle(config, (modConfig) => {
-    modConfig.modResults.contents = updateSettingsGradle(
       modConfig.modResults.contents
     );
     return modConfig;
