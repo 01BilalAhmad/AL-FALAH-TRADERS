@@ -1,7 +1,8 @@
 // Powered by OnSpace.AI
 // Recovery Receipt — renders as a solid View (no LinearGradient) so captureRef works.
-// After capturing as image, it's sent directly to shopkeeper's WhatsApp via Android Intent.
-// Uses expo-intent-launcher to send image directly to specific WhatsApp contact.
+// After capturing as image, it's shared to shopkeeper via WhatsApp.
+// Strategy: Open WhatsApp chat directly to the shopkeeper's number,
+// then save receipt to gallery so OB can attach it (non-editable, fraud-proof).
 import React, { useRef, useState, useEffect } from 'react';
 import {
   View,
@@ -16,10 +17,9 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { captureRef } from 'react-native-view-shot';
-import * as Sharing from 'expo-sharing';
 import * as Linking from 'expo-linking';
-import * as IntentLauncher from 'expo-intent-launcher';
 import * as FileSystem from 'expo-file-system';
+import * as MediaLibrary from 'expo-media-library';
 import { formatPKR } from '@/utils/format';
 import { Spacing, Radius, FontSize, FontWeight, Shadow } from '@/constants/theme';
 
@@ -76,9 +76,14 @@ export function RecoveryReceipt({
   });
 
   /**
-   * Send receipt image directly to shopkeeper's WhatsApp number.
-   * Uses Android Intent to open WhatsApp directly with the image,
-   * targeting the specific contact via WhatsApp's JID system.
+   * Send receipt to WhatsApp:
+   * 1. Capture receipt as image
+   * 2. Save image to device Gallery
+   * 3. Open WhatsApp chat directly to shopkeeper's number
+   * 4. OB taps attachment (📎) → Gallery → selects receipt → Send
+   * 
+   * This is the ONLY reliable way to send image to a specific WhatsApp number.
+   * Image is non-editable = fraud-proof.
    */
   const handleShareImage = async () => {
     if (isCapturing) return;
@@ -101,112 +106,79 @@ export function RecoveryReceipt({
 
       console.log('[RecoveryReceipt] Image captured at:', imageUri);
 
-      // Step 2: Send image directly to WhatsApp via Android Intent
-      if (Platform.OS === 'android') {
-        await sendImageToWhatsAppAndroid(imageUri, shopPhone);
-      } else {
-        // iOS fallback: use share sheet
-        const isAvailable = await Sharing.isAvailableAsync();
-        if (isAvailable) {
-          await Sharing.shareAsync(imageUri, {
-            mimeType: 'image/png',
-            dialogTitle: `Share Receipt to ${shopName}`,
-            UTI: 'public.png',
-          });
-        } else {
-          throw new Error('Sharing not available');
+      // Step 2: Save image to device Gallery
+      let savedToGallery = false;
+      try {
+        const { status } = await MediaLibrary.requestPermissionsAsync();
+        if (status === 'granted') {
+          const asset = await MediaLibrary.createAssetAsync(imageUri);
+          // Create album for easy access
+          try {
+            await MediaLibrary.createAlbumAsync('AlFalah Receipts', asset, false);
+          } catch {
+            // Album might already exist, try adding to it
+            try {
+              const album = await MediaLibrary.getAlbumAsync('AlFalah Receipts');
+              if (album) {
+                await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+              }
+            } catch {}
+          }
+          savedToGallery = true;
+          console.log('[RecoveryReceipt] Image saved to gallery:', asset.uri);
         }
+      } catch (galleryErr) {
+        console.warn('[RecoveryReceipt] Could not save to gallery:', galleryErr);
+      }
+
+      // Step 3: Open WhatsApp chat directly to shopkeeper's number
+      if (shopPhone) {
+        const phone = formatPhoneIntl(shopPhone);
+        const whatsappUrl = `https://wa.me/${phone}`;
+        const canOpen = await Linking.canOpenURL(whatsappUrl);
+        if (canOpen) {
+          await Linking.openURL(whatsappUrl);
+
+          // Step 4: Show instruction
+          if (savedToGallery) {
+            Alert.alert(
+              '✅ Receipt Ready!',
+              `Receipt saved in Gallery!\n\nWhatsApp chat opened for ${shopName}.\n\n📎 Tap attachment button → Gallery → "AlFalah Receipts" → Select receipt → Send`,
+              [{ text: 'OK' }]
+            );
+          } else {
+            Alert.alert(
+              'Receipt Ready',
+              `WhatsApp chat opened for ${shopName}.\n\n📎 Attach the receipt image from your Gallery to send it.`,
+              [{ text: 'OK' }]
+            );
+          }
+        } else {
+          Alert.alert('WhatsApp Not Available', 'Please install WhatsApp to send receipt.');
+        }
+      } else {
+        Alert.alert('No Phone Number', 'This shop has no phone number for WhatsApp.');
       }
     } catch (error: any) {
       console.error('[RecoveryReceipt] Share failed:', error);
 
-      // Fallback: Open WhatsApp chat (text only, but at least goes to correct number)
-      Alert.alert(
-        'Image Share Failed',
-        'Receipt image send nahi ho saka. WhatsApp chat kholen?',
-        [
-          {
-            text: 'WhatsApp Chat Kholo',
-            onPress: () => {
-              // Open WhatsApp chat without pre-filled amounts (no fraud risk)
-              if (shopPhone) {
-                const phone = formatPhoneIntl(shopPhone);
-                Linking.openURL(`https://wa.me/${phone}`);
-              } else {
-                Alert.alert('No Phone', 'Is shop ka phone number nahi hai.');
-              }
+      // Fallback: Just open WhatsApp chat
+      if (shopPhone) {
+        const phone = formatPhoneIntl(shopPhone);
+        Alert.alert(
+          'Image Error',
+          'Receipt image save nahi hua. WhatsApp chat kholen?',
+          [
+            {
+              text: 'WhatsApp Kholo',
+              onPress: () => Linking.openURL(`https://wa.me/${phone}`),
             },
-          },
-          { text: 'Cancel', style: 'cancel' },
-        ]
-      );
+            { text: 'Cancel', style: 'cancel' },
+          ]
+        );
+      }
     } finally {
       setIsCapturing(false);
-    }
-  };
-
-  /**
-   * Android: Send image directly to WhatsApp using Intent.
-   * Uses ACTION_SEND with WhatsApp package to skip share sheet.
-   * Includes JID extra to target specific contact.
-   */
-  const sendImageToWhatsAppAndroid = async (imageUri: string, phone: string) => {
-    try {
-      // Convert file URI to content URI that WhatsApp can read
-      let contentUri = imageUri;
-
-      // If it's a file:// URI, we need to make it accessible
-      if (imageUri.startsWith('file://')) {
-        try {
-          contentUri = await FileSystem.getContentUriAsync(imageUri);
-        } catch {
-          // If getContentUriAsync fails, try with the original URI
-          contentUri = imageUri;
-        }
-      }
-
-      // Format the WhatsApp JID (phone number in international format)
-      const formattedPhone = phone ? formatPhoneIntl(phone) : '';
-      const whatsappJid = formattedPhone ? `${formattedPhone}@s.whatsapp.net` : '';
-
-      // Build the Android Intent
-      const intentParams: any = {
-        action: 'android.intent.action.SEND',
-        type: 'image/png',
-        packageName: 'com.whatsapp',
-        extra: {
-          'android.intent.extra.STREAM': contentUri,
-        },
-        flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
-      };
-
-      // Add JID to target specific contact (unofficial but works on most WhatsApp versions)
-      if (whatsappJid) {
-        intentParams.extra['jid'] = whatsappJid;
-      }
-
-      await IntentLauncher.startActivityAsync(
-        'android.intent.action.SEND',
-        intentParams
-      );
-
-      console.log('[RecoveryReceipt] WhatsApp intent launched successfully');
-    } catch (intentError: any) {
-      console.warn('[RecoveryReceipt] WhatsApp intent failed:', intentError.message);
-
-      // If intent fails, try fallback: share sheet
-      try {
-        const isAvailable = await Sharing.isAvailableAsync();
-        if (isAvailable) {
-          await Sharing.shareAsync(imageUri, {
-            mimeType: 'image/png',
-            dialogTitle: `Share Receipt to ${shopName}`,
-            UTI: 'public.png',
-          });
-        }
-      } catch (shareError) {
-        throw shareError;
-      }
     }
   };
 
@@ -318,7 +290,7 @@ export function RecoveryReceipt({
               {isCapturing ? (
                 <>
                   <ActivityIndicator size="small" color="#FFFFFF" />
-                  <Text style={styles.shareBtnText}>Generating Receipt...</Text>
+                  <Text style={styles.shareBtnText}>Saving Receipt...</Text>
                 </>
               ) : (
                 <>
@@ -371,7 +343,7 @@ const styles = StyleSheet.create({
   // ===== RECEIPT (Solid bg for captureRef) =====
   receipt: {
     borderRadius: Radius.xl,
-    padding: 24,
+    padding: 28,
     backgroundColor: '#1D4ED8',
     overflow: 'hidden',
     ...Shadow.lg,
@@ -390,8 +362,8 @@ const styles = StyleSheet.create({
   receiptHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginBottom: Spacing.md,
+    gap: 14,
+    marginBottom: 20,
     zIndex: 1,
   },
   receiptLogoWrap: {
@@ -425,7 +397,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
-    marginBottom: Spacing.md,
+    marginBottom: 20,
     zIndex: 1,
   },
   receiptDividerLine: {
@@ -445,8 +417,8 @@ const styles = StyleSheet.create({
   receiptShopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 6,
+    gap: 10,
+    marginBottom: 12,
     zIndex: 1,
   },
   receiptShopLabel: {
@@ -466,8 +438,8 @@ const styles = StyleSheet.create({
   receiptDateRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: Spacing.md,
+    gap: 8,
+    marginBottom: 20,
     zIndex: 1,
   },
   receiptDate: {
@@ -480,8 +452,8 @@ const styles = StyleSheet.create({
   receiptAmounts: {
     backgroundColor: 'rgba(0,0,0,0.2)',
     borderRadius: Radius.lg,
-    padding: 18,
-    marginBottom: Spacing.md,
+    padding: 22,
+    marginBottom: 20,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
     zIndex: 1,
@@ -490,7 +462,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 12,
   },
   receiptAmountLabel: {
     fontSize: 15,
@@ -505,7 +477,7 @@ const styles = StyleSheet.create({
   receiptAmountSeparator: {
     height: 1,
     backgroundColor: 'rgba(255,255,255,0.1)',
-    marginVertical: 4,
+    marginVertical: 6,
   },
   receiptRemainingRow: {
     backgroundColor: 'rgba(250,204,21,0.08)',
@@ -520,8 +492,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    marginBottom: Spacing.md,
+    gap: 10,
+    marginBottom: 20,
     zIndex: 1,
   },
   receiptThankText: {
