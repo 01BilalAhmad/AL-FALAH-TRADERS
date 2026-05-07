@@ -63,7 +63,8 @@
             "targetSdkVersion": 35
           }
         }
-      ]
+      ],
+      "./plugins/withAndroidBuildFix.js"
     ],
     "experiments": {
       "typedRoutes": true
