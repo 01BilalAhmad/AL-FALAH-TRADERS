@@ -1,6 +1,7 @@
 // Powered by OnSpace.AI
-// Recovery Receipt — rendered as a solid View (no LinearGradient) so captureRef works.
-// After capturing as image, it's shared to shopkeeper via WhatsApp.
+// Recovery Receipt — renders as a solid View (no LinearGradient) so captureRef works.
+// After capturing as image, it's sent directly to shopkeeper's WhatsApp via Android Intent.
+// Uses expo-intent-launcher to send image directly to specific WhatsApp contact.
 import React, { useRef, useState, useEffect } from 'react';
 import {
   View,
@@ -11,11 +12,14 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  Platform,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import * as Linking from 'expo-linking';
+import * as IntentLauncher from 'expo-intent-launcher';
+import * as FileSystem from 'expo-file-system';
 import { formatPKR } from '@/utils/format';
 import { Spacing, Radius, FontSize, FontWeight, Shadow } from '@/constants/theme';
 
@@ -27,6 +31,15 @@ interface RecoveryReceiptProps {
   recoveryAmount: number;
   remainingBalance: number;
   onClose: () => void;
+}
+
+/** Format phone number to international format (923001234567) */
+function formatPhoneIntl(phone: string): string {
+  let p = phone.trim().replace(/[^0-9]/g, '');
+  if (p.startsWith('+')) p = p.substring(1);
+  if (p.startsWith('0')) p = p.substring(1);
+  if (!p.startsWith('92')) p = '92' + p;
+  return p.replace(/[^0-9]/g, '');
 }
 
 export function RecoveryReceipt({
@@ -62,13 +75,20 @@ export function RecoveryReceipt({
     year: 'numeric',
   });
 
+  /**
+   * Send receipt image directly to shopkeeper's WhatsApp number.
+   * Uses Android Intent to open WhatsApp directly with the image,
+   * targeting the specific contact via WhatsApp's JID system.
+   */
   const handleShareImage = async () => {
     if (isCapturing) return;
     setIsCapturing(true);
 
     try {
+      // Wait for UI to render
       await new Promise(r => setTimeout(r, 300));
 
+      // Step 1: Capture receipt as image
       const imageUri = await captureRef(receiptRef, {
         format: 'png',
         quality: 1.0,
@@ -81,44 +101,40 @@ export function RecoveryReceipt({
 
       console.log('[RecoveryReceipt] Image captured at:', imageUri);
 
-      // Share via native share sheet (WhatsApp, etc.)
-      const isAvailable = await Sharing.isAvailableAsync();
-      if (isAvailable) {
-        await Sharing.shareAsync(imageUri, {
-          mimeType: 'image/png',
-          dialogTitle: `Share Receipt to ${shopName}`,
-          UTI: 'public.png',
-        });
-
-        // After sharing image, also send text message to shopkeeper on WhatsApp
-        // This ensures the shopkeeper receives BOTH image AND text
-        if (shopPhone) {
-          try {
-            const textMessage = buildReceiptText();
-            await openWhatsAppWithText(shopPhone, textMessage);
-          } catch (textErr) {
-            console.warn('[RecoveryReceipt] Could not send text after image share:', textErr);
-          }
-        }
+      // Step 2: Send image directly to WhatsApp via Android Intent
+      if (Platform.OS === 'android') {
+        await sendImageToWhatsAppAndroid(imageUri, shopPhone);
       } else {
-        throw new Error('Sharing not available');
+        // iOS fallback: use share sheet
+        const isAvailable = await Sharing.isAvailableAsync();
+        if (isAvailable) {
+          await Sharing.shareAsync(imageUri, {
+            mimeType: 'image/png',
+            dialogTitle: `Share Receipt to ${shopName}`,
+            UTI: 'public.png',
+          });
+        } else {
+          throw new Error('Sharing not available');
+        }
       }
     } catch (error: any) {
       console.error('[RecoveryReceipt] Share failed:', error);
 
-      // Fallback: Open WhatsApp with text message
+      // Fallback: Open WhatsApp chat (text only, but at least goes to correct number)
       Alert.alert(
         'Image Share Failed',
-        'Picture share nahi hua. Text message bhejna hai?',
+        'Receipt image send nahi ho saka. WhatsApp chat kholen?',
         [
           {
-            text: 'WhatsApp Text Bhejo',
+            text: 'WhatsApp Chat Kholo',
             onPress: () => {
-              const msg = encodeURIComponent(buildReceiptText());
-              let phone = shopPhone.trim().replace(/[^0-9]/g, '');
-              if (phone.startsWith('0')) phone = phone.substring(1);
-              if (!phone.startsWith('92')) phone = '92' + phone;
-              Linking.openURL(`https://wa.me/${phone}?text=${msg}`);
+              // Open WhatsApp chat without pre-filled amounts (no fraud risk)
+              if (shopPhone) {
+                const phone = formatPhoneIntl(shopPhone);
+                Linking.openURL(`https://wa.me/${phone}`);
+              } else {
+                Alert.alert('No Phone', 'Is shop ka phone number nahi hai.');
+              }
             },
           },
           { text: 'Cancel', style: 'cancel' },
@@ -129,44 +145,69 @@ export function RecoveryReceipt({
     }
   };
 
-  /** Build receipt text message */
-  const buildReceiptText = (): string => {
-    return `Al FALAH Credit System - Payment Receipt\n\n`
-      + `Shop: ${shopName}\n`
-      + `Date: ${today}\n\n`
-      + `Opening Balance: ${formatPKR(openingBalance)}\n`
-      + `Recovery Received: ${formatPKR(recoveryAmount)}\n`
-      + `Remaining Balance: ${formatPKR(remainingBalance)}\n\n`
-      + `Thank you for your payment!\n`
-      + `Al FALAH Credit System`;
-  };
-
-  /** Open WhatsApp chat with text message to a phone number */
-  const openWhatsAppWithText = async (phone: string, message: string): Promise<boolean> => {
-    if (!phone || phone.trim().length === 0) return false;
-
-    let formattedPhone = phone.trim().replace(/[^0-9]/g, '');
-    if (formattedPhone.startsWith('0')) {
-      formattedPhone = formattedPhone.substring(1);
-    }
-    if (!formattedPhone.startsWith('92')) {
-      formattedPhone = '92' + formattedPhone;
-    }
-    formattedPhone = formattedPhone.replace(/[^0-9]/g, '');
-
-    const encodedMessage = encodeURIComponent(message);
-    const url = `https://wa.me/${formattedPhone}?text=${encodedMessage}`;
-
+  /**
+   * Android: Send image directly to WhatsApp using Intent.
+   * Uses ACTION_SEND with WhatsApp package to skip share sheet.
+   * Includes JID extra to target specific contact.
+   */
+  const sendImageToWhatsAppAndroid = async (imageUri: string, phone: string) => {
     try {
-      const canOpen = await Linking.canOpenURL(url);
-      if (canOpen) {
-        await Linking.openURL(url);
-        return true;
+      // Convert file URI to content URI that WhatsApp can read
+      let contentUri = imageUri;
+
+      // If it's a file:// URI, we need to make it accessible
+      if (imageUri.startsWith('file://')) {
+        try {
+          contentUri = await FileSystem.getContentUriAsync(imageUri);
+        } catch {
+          // If getContentUriAsync fails, try with the original URI
+          contentUri = imageUri;
+        }
       }
-    } catch (e) {
-      console.warn('[RecoveryReceipt] Could not open WhatsApp with text:', e);
+
+      // Format the WhatsApp JID (phone number in international format)
+      const formattedPhone = phone ? formatPhoneIntl(phone) : '';
+      const whatsappJid = formattedPhone ? `${formattedPhone}@s.whatsapp.net` : '';
+
+      // Build the Android Intent
+      const intentParams: any = {
+        action: 'android.intent.action.SEND',
+        type: 'image/png',
+        packageName: 'com.whatsapp',
+        extra: {
+          'android.intent.extra.STREAM': contentUri,
+        },
+        flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
+      };
+
+      // Add JID to target specific contact (unofficial but works on most WhatsApp versions)
+      if (whatsappJid) {
+        intentParams.extra['jid'] = whatsappJid;
+      }
+
+      await IntentLauncher.startActivityAsync(
+        'android.intent.action.SEND',
+        intentParams
+      );
+
+      console.log('[RecoveryReceipt] WhatsApp intent launched successfully');
+    } catch (intentError: any) {
+      console.warn('[RecoveryReceipt] WhatsApp intent failed:', intentError.message);
+
+      // If intent fails, try fallback: share sheet
+      try {
+        const isAvailable = await Sharing.isAvailableAsync();
+        if (isAvailable) {
+          await Sharing.shareAsync(imageUri, {
+            mimeType: 'image/png',
+            dialogTitle: `Share Receipt to ${shopName}`,
+            UTI: 'public.png',
+          });
+        }
+      } catch (shareError) {
+        throw shareError;
+      }
     }
-    return false;
   };
 
   if (!visible) return null;
@@ -282,7 +323,7 @@ export function RecoveryReceipt({
               ) : (
                 <>
                   <MaterialIcons name="chat" size={22} color="#FFFFFF" />
-                  <Text style={styles.shareBtnText}>Share Receipt to WhatsApp</Text>
+                  <Text style={styles.shareBtnText}>Send Receipt to WhatsApp</Text>
                 </>
               )}
             </View>
