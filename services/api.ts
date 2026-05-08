@@ -249,4 +249,10 @@ export const ApiService = {
       method: 'PATCH',
       body: JSON.stringify({ shopId, phone }),
     }),
+
+  updateUserPhone: (userId: string, phone: string) =>
+    request<{ success: boolean; userId: string; newPhone: string }>('/api/users/phone', {
+      method: 'PATCH',
+      body: JSON.stringify({ userId, phone }),
+    }),
 };

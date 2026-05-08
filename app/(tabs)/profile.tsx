@@ -1,5 +1,5 @@
 // Powered by OnSpace.AI
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Alert,
   ActivityIndicator,
   Dimensions,
+  TextInput,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -116,7 +117,7 @@ const kpiStyles = StyleSheet.create({
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, updatePhone } = useAuth();
   const { allShops } = useShops();
   const { setNeedsPinSetup, lock } = useLock();
 
@@ -124,6 +125,12 @@ export default function ProfileScreen() {
   const [todayRecovery, setTodayRecovery] = useState(0);
   const [thisMonthRecovery, setThisMonthRecovery] = useState(0);
   const [showAnalysis, setShowAnalysis] = useState(false);
+
+  // Phone edit state
+  const [isEditingPhone, setIsEditingPhone] = useState(false);
+  const [phoneInput, setPhoneInput] = useState('');
+  const [isSavingPhone, setIsSavingPhone] = useState(false);
+  const phoneInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     if (user) loadStats();
@@ -147,6 +154,25 @@ export default function ProfileScreen() {
       setThisMonthRecovery(monthTxns.transactions.reduce((sum, t) => sum + t.amount, 0));
     } catch { /* not critical */ }
   }
+
+  const handleSavePhone = async () => {
+    const trimmed = phoneInput.trim();
+    if (trimmed && !/^[\d+\-\s()]{7,15}$/.test(trimmed)) {
+      Alert.alert('Invalid Phone', 'Please enter a valid phone number (7-15 digits)');
+      return;
+    }
+    setIsSavingPhone(true);
+    try {
+      await updatePhone(trimmed);
+      setIsEditingPhone(false);
+      setPhoneInput('');
+      Alert.alert('Phone Updated', trimmed ? `Distributor number set to ${trimmed}` : 'Phone number removed');
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to update phone number');
+    } finally {
+      setIsSavingPhone(false);
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert('Logout', 'Are you sure you want to logout?', [
@@ -225,7 +251,93 @@ export default function ProfileScreen() {
           <Text style={styles.cardTitle}>Account Details</Text>
           <InfoRow icon="person" label="Username" value={`@${user.username}`} />
           <View style={styles.divider} />
-          <InfoRow icon="call" label="Phone" value={user.phone || 'Not set'} />
+          <View style={infoRowStyles.row}>
+            <View style={infoRowStyles.iconWrap}>
+              <MaterialIcons name="call" size={18} color={Colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={infoRowStyles.label}>Phone (Distributor Number)</Text>
+              {isEditingPhone ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                  <TextInput
+                    ref={phoneInputRef}
+                    value={phoneInput}
+                    onChangeText={setPhoneInput}
+                    placeholder="03XXXXXXXXX"
+                    keyboardType="phone-pad"
+                    maxLength={15}
+                    style={{
+                      flex: 1,
+                      height: 36,
+                      borderWidth: 1,
+                      borderColor: Colors.primary,
+                      borderRadius: Radius.sm,
+                      paddingHorizontal: 10,
+                      fontSize: FontSize.base,
+                      color: Colors.text,
+                      backgroundColor: Colors.background,
+                    }}
+                    autoFocus
+                    editable={!isSavingPhone}
+                    onSubmitEditing={handleSavePhone}
+                  />
+                  <Pressable
+                    onPress={handleSavePhone}
+                    disabled={isSavingPhone}
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 16,
+                      backgroundColor: Colors.primary,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {isSavingPhone ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <MaterialIcons name="check" size={18} color="#FFFFFF" />
+                    )}
+                  </Pressable>
+                  <Pressable
+                    onPress={() => { setIsEditingPhone(false); setPhoneInput(''); }}
+                    disabled={isSavingPhone}
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 16,
+                      backgroundColor: Colors.borderLight,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <MaterialIcons name="close" size={18} color={Colors.textSecondary} />
+                  </Pressable>
+                </View>
+              ) : (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={infoRowStyles.value}>{user.phone || 'Not set'}</Text>
+                  <Pressable
+                    onPress={() => {
+                      setPhoneInput(user.phone || '');
+                      setIsEditingPhone(true);
+                      setTimeout(() => phoneInputRef.current?.focus(), 100);
+                    }}
+                    style={{
+                      width: 24,
+                      height: 24,
+                      borderRadius: 12,
+                      backgroundColor: Colors.primaryLight,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <MaterialIcons name="edit" size={14} color={Colors.primary} />
+                  </Pressable>
+                </View>
+              )}
+            </View>
+          </View>
           <View style={styles.divider} />
           <InfoRow
             icon="verified-user"

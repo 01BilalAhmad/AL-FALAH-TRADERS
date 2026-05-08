@@ -10,6 +10,7 @@ export interface AuthContextType {
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  updatePhone: (phone: string) => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -58,8 +59,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (saved) setUser(saved);
   }
 
+  async function updatePhone(phone: string) {
+    if (!user) return;
+    await ApiService.updateUserPhone(user.id, phone);
+    const updatedUser = { ...user, phone };
+    setUser(updatedUser);
+    const currentToken = await StorageService.getToken();
+    if (currentToken) {
+      await StorageService.saveUser(updatedUser, currentToken);
+    }
+  }
+
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, logout, refreshUser, updatePhone }}>
       {children}
     </AuthContext.Provider>
   );
