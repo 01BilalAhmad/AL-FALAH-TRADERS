@@ -343,7 +343,7 @@ const styles = StyleSheet.create({
   // ===== RECEIPT (Solid bg for captureRef) =====
   receipt: {
     borderRadius: Radius.xl,
-    padding: 18,
+    padding: 14,
     backgroundColor: '#1D4ED8',
     overflow: 'hidden',
     ...Shadow.lg,
@@ -363,13 +363,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginBottom: 10,
+    marginBottom: 6,
     zIndex: 1,
   },
   receiptLogoWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
+    width: 34,
+    height: 34,
+    borderRadius: 8,
     backgroundColor: 'rgba(255,255,255,0.15)',
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.3)',
@@ -380,7 +380,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   receiptBrandName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: FontWeight.bold,
     color: '#FFFFFF',
     letterSpacing: 0.3,
@@ -397,7 +397,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
-    marginBottom: 8,
+    marginBottom: 4,
     zIndex: 1,
   },
   receiptDividerLine: {
@@ -418,7 +418,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginBottom: 4,
+    marginBottom: 2,
     zIndex: 1,
   },
   receiptShopLabel: {
@@ -439,7 +439,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 10,
+    marginBottom: 6,
     zIndex: 1,
   },
   receiptDate: {
@@ -452,8 +452,8 @@ const styles = StyleSheet.create({
   receiptAmounts: {
     backgroundColor: 'rgba(0,0,0,0.2)',
     borderRadius: Radius.lg,
-    padding: 14,
-    marginBottom: 10,
+    padding: 10,
+    marginBottom: 6,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
     zIndex: 1,
@@ -462,7 +462,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 6,
+    paddingVertical: 3,
   },
   receiptAmountLabel: {
     fontSize: 15,
@@ -477,14 +477,14 @@ const styles = StyleSheet.create({
   receiptAmountSeparator: {
     height: 1,
     backgroundColor: 'rgba(255,255,255,0.1)',
-    marginVertical: 2,
+    marginVertical: 1,
   },
   receiptRemainingRow: {
     backgroundColor: 'rgba(250,204,21,0.08)',
-    marginHorizontal: -10,
-    paddingHorizontal: 10,
+    marginHorizontal: -8,
+    paddingHorizontal: 8,
     borderRadius: Radius.sm,
-    marginTop: 4,
+    marginTop: 2,
   },
 
   // Thank You
@@ -492,12 +492,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
-    marginBottom: 10,
+    gap: 8,
+    marginBottom: 6,
     zIndex: 1,
   },
   receiptThankText: {
-    fontSize: 15,
+    fontSize: 14,
     color: '#A7F3D0',
     fontWeight: FontWeight.semibold,
   },
@@ -512,7 +512,7 @@ const styles = StyleSheet.create({
     height: 2,
     borderRadius: 1,
     backgroundColor: 'rgba(255,255,255,0.2)',
-    marginBottom: Spacing.sm,
+    marginBottom: 4,
   },
   receiptFooterText: {
     fontSize: 11,
