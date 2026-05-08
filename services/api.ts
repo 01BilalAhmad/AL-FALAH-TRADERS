@@ -244,10 +244,10 @@ export const ApiService = {
       body: JSON.stringify(payload),
     }),
 
-  updateShopPhone: (shopId: string, phone: string) =>
+  updateShopPhone: (shopId: string, phone: string, ownerName?: string) =>
     request<{ success: boolean; shopId: string; newPhone: string }>('/api/shops/phone', {
       method: 'PATCH',
-      body: JSON.stringify({ shopId, phone }),
+      body: JSON.stringify({ shopId, phone, ownerName: ownerName || undefined }),
     }),
 
   updateUserPhone: (userId: string, phone: string) =>

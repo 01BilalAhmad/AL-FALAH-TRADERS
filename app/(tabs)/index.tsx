@@ -80,6 +80,8 @@ export default function TodayRouteScreen() {
     shopId: string;
     shopPhone: string;
     shopName: string;
+    shopAddress?: string;
+    shopOwnerName?: string;
     openingBalance: number;
     recoveryAmount: number;
     remainingBalance: number;
@@ -95,6 +97,8 @@ export default function TodayRouteScreen() {
     shopId: string;
     shopPhone: string;
     shopName: string;
+    shopAddress?: string;
+    shopOwnerName?: string;
     openingBalance: number;
     recoveryAmount: number;
     remainingBalance: number;
@@ -312,6 +316,8 @@ export default function TodayRouteScreen() {
             shopId,
             shopPhone,
             shopName,
+            shopAddress: recoveryShop.address || recoveryShop.area || undefined,
+            shopOwnerName: recoveryShop.ownerName || undefined,
             openingBalance,
             recoveryAmount: payload.amount,
             remainingBalance,
@@ -331,6 +337,8 @@ export default function TodayRouteScreen() {
                 shopId: shopId,
                 shopPhone,
                 shopName,
+                shopAddress: recoveryShop.address || recoveryShop.area || undefined,
+                shopOwnerName: recoveryShop.ownerName || undefined,
                 openingBalance,
                 recoveryAmount: payload.amount,
                 remainingBalance,
@@ -462,7 +470,7 @@ export default function TodayRouteScreen() {
   }, []);
 
   // Handle phone number saved from PhoneInputModal → show NotificationChoice
-  const handlePhoneSaved = useCallback((savedPhone: string) => {
+  const handlePhoneSaved = useCallback((savedPhone: string, savedOwnerName?: string) => {
     if (!phoneInputShop || !user) return;
     const shopName = phoneInputShop.name;
     const shopId = phoneInputShop.id;
@@ -471,6 +479,9 @@ export default function TodayRouteScreen() {
     // Find the last recovery amount for this shop
     const remainingBalance = openingBalance - (lastRecoveryInfo?.shopId === shopId ? lastRecoveryInfo.amount : 0);
     const recoveryAmount = lastRecoveryInfo?.shopId === shopId ? lastRecoveryInfo.amount : 0;
+
+    // Use saved owner name if provided, otherwise fall back to shop's existing ownerName
+    const ownerName = savedOwnerName || phoneInputShop.ownerName || undefined;
 
     // Create pending notification with the new phone number
     const pendingNotif: PendingNotification = {
@@ -484,7 +495,7 @@ export default function TodayRouteScreen() {
       remainingBalance,
       companyName: user.companyName || undefined,
       orderbookerName: user.name || undefined,
-      distributorPhone: user.phone || undefined,
+      distributorPhone: distributorPhone || undefined,
       createdAt: new Date().toISOString(),
       date: getTodayDateStr(),
     };
@@ -498,14 +509,16 @@ export default function TodayRouteScreen() {
       shopId: phoneInputShop?.id || '',
       shopPhone: savedPhone,
       shopName,
+      shopAddress: phoneInputShop.address || phoneInputShop.area || undefined,
+      shopOwnerName: ownerName,
       openingBalance,
       recoveryAmount,
       remainingBalance,
       companyName: user.companyName || undefined,
       orderbookerName: user.name || undefined,
-      distributorPhone: user.phone || undefined,
+      distributorPhone: distributorPhone || undefined,
     });
-  }, [phoneInputShop, user, lastRecoveryInfo]);
+  }, [phoneInputShop, user, lastRecoveryInfo, distributorPhone]);
 
   // Feature 13: Handle reminder shop press
   const handleReminderShopPress = useCallback((shopId: string) => {
@@ -543,13 +556,21 @@ export default function TodayRouteScreen() {
   const groupedSections = useMemo(() => {
     if (!allRoutesEnabled) return null;
 
-    // Group filtered shops by routeDays (a shop can appear in multiple day groups)
+    // Group filtered shops by routeDays — each shop appears ONLY ONCE under its primary day
+    // (prefer today's route, otherwise first day in its routeDays array)
     const groups: Record<string, Shop[]> = {};
+    const assignedShops = new Set<string>();
+
     for (const shop of filteredShops) {
-      for (const day of (shop.routeDays.length > 0 ? shop.routeDays : ['other'])) {
-        if (!groups[day]) groups[day] = [];
-        groups[day].push(shop);
-      }
+      if (assignedShops.has(shop.id)) continue; // skip if already placed
+
+      const days = shop.routeDays.length > 0 ? shop.routeDays : ['other'];
+      // Prefer today's route if the shop has it, otherwise use first day
+      const primaryDay = days.includes(todayDay) ? todayDay : days[0];
+
+      if (!groups[primaryDay]) groups[primaryDay] = [];
+      groups[primaryDay].push(shop);
+      assignedShops.add(shop.id);
     }
 
     // Sort: today's route FIRST, then other days by ROUTE_DAYS order
@@ -623,7 +644,7 @@ export default function TodayRouteScreen() {
         <FlatList
           data={groupedSections}
           keyExtractor={(item, idx) =>
-            item.type === 'header' ? `header_${item.dayKey}` : `shop_${item.shop.id}`
+            item.type === 'header' ? `header_${item.dayKey}` : `shop_${item.shop.id}_${item.dayKey}`
           }
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -1201,6 +1222,8 @@ export default function TodayRouteScreen() {
         payload={notifChoice.visible ? {
           shopPhone: notifChoice.shopPhone,
           shopName: notifChoice.shopName,
+          shopAddress: notifChoice.shopAddress,
+          shopOwnerName: notifChoice.shopOwnerName,
           openingBalance: notifChoice.openingBalance,
           recoveryAmount: notifChoice.recoveryAmount,
           remainingBalance: notifChoice.remainingBalance,

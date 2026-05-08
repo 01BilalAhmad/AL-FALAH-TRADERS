@@ -1,5 +1,6 @@
 // Al FALAH Credit System - Phone Input Modal
 // Shows when a shop has no phone number saved after recovery submission
+// Also allows adding/editing the shop owner's name
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -21,12 +22,13 @@ import { ApiService } from '@/services/api';
 interface PhoneInputModalProps {
   visible: boolean;
   shop: Shop | null;
-  onPhoneSaved: (phone: string) => void;
+  onPhoneSaved: (phone: string, ownerName?: string) => void;
   onSkip: () => void;
 }
 
 export function PhoneInputModal({ visible, shop, onPhoneSaved, onSkip }: PhoneInputModalProps) {
   const [phone, setPhone] = useState('');
+  const [ownerName, setOwnerName] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const scaleAnim = useRef(new Animated.Value(0.85)).current;
@@ -35,6 +37,7 @@ export function PhoneInputModal({ visible, shop, onPhoneSaved, onSkip }: PhoneIn
   useEffect(() => {
     if (visible) {
       setPhone('');
+      setOwnerName(shop?.ownerName || '');
       setError('');
       setSaving(false);
       Animated.parallel([
@@ -85,10 +88,14 @@ export function PhoneInputModal({ visible, shop, onPhoneSaved, onSkip }: PhoneIn
         normalized = '0' + normalized.substring(2);
       }
 
-      await ApiService.updateShopPhone(shop.id, normalized);
+      const trimmedOwner = ownerName.trim();
+      await ApiService.updateShopPhone(shop.id, normalized, trimmedOwner || undefined);
       // Update the shop object locally so it reflects immediately
       shop.phone = normalized;
-      onPhoneSaved(normalized);
+      if (trimmedOwner) {
+        shop.ownerName = trimmedOwner;
+      }
+      onPhoneSaved(normalized, trimmedOwner || undefined);
     } catch (e: any) {
       setError(e.message || 'Failed to save number. Try again.');
     } finally {
@@ -121,8 +128,32 @@ export function PhoneInputModal({ visible, shop, onPhoneSaved, onSkip }: PhoneIn
             </Text>
           </View>
 
+          {/* Owner Name Input */}
+          <View style={styles.inputSection}>
+            <Text style={styles.inputLabel}>Owner Name</Text>
+            <View style={styles.ownerInputWrap}>
+              <MaterialIcons name="person" size={20} color={Colors.textMuted} />
+              <TextInput
+                style={styles.ownerInput}
+                value={ownerName}
+                onChangeText={(text) => {
+                  setOwnerName(text);
+                }}
+                placeholder="e.g. Muhammad Ali"
+                placeholderTextColor={Colors.textMuted}
+                maxLength={50}
+              />
+              {ownerName ? (
+                <Pressable onPress={() => setOwnerName('')} style={styles.clearBtn} hitSlop={8}>
+                  <MaterialIcons name="close" size={18} color={Colors.textMuted} />
+                </Pressable>
+              ) : null}
+            </View>
+          </View>
+
           {/* Phone Input */}
           <View style={styles.inputSection}>
+            <Text style={styles.inputLabel}>Phone Number</Text>
             <View style={[styles.inputWrap, error ? styles.inputWrapError : null]}>
               <View style={styles.countryCode}>
                 <Text style={styles.countryCodeText}>+92</Text>
@@ -155,7 +186,7 @@ export function PhoneInputModal({ visible, shop, onPhoneSaved, onSkip }: PhoneIn
             ) : null}
 
             <Text style={styles.hintText}>
-              Enter shopkeeper's WhatsApp or phone number. This will be saved to the database.
+              Enter shopkeeper's WhatsApp or phone number. Owner name and phone will be saved to the database.
             </Text>
           </View>
 
@@ -220,7 +251,7 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.md,
   },
   iconWrap: {
     width: 64,
@@ -249,7 +280,33 @@ const styles = StyleSheet.create({
     color: Colors.primary,
   },
   inputSection: {
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.md,
+  },
+  inputLabel: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semibold,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.xs,
+    marginLeft: 2,
+  },
+  ownerInputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.md,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 2,
+    ...Shadow.sm,
+  },
+  ownerInput: {
+    flex: 1,
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.semibold,
+    color: Colors.text,
+    paddingVertical: 14,
+    paddingHorizontal: Spacing.sm,
   },
   inputWrap: {
     flexDirection: 'row',

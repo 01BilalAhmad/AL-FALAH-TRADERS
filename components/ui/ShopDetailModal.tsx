@@ -63,6 +63,8 @@ export const ShopDetailModal = memo(function ShopDetailModal({
   const [phoneInput, setPhoneInput] = useState('');
   const [phoneSaving, setPhoneSaving] = useState(false);
   const [localPhone, setLocalPhone] = useState<string | null>(null);
+  const [ownerNameInput, setOwnerNameInput] = useState('');
+  const [localOwnerName, setLocalOwnerName] = useState<string | null>(null);
 
   useEffect(() => {
     if (visible && shop) {
@@ -72,6 +74,8 @@ export const ShopDetailModal = memo(function ShopDetailModal({
       setLocalPhone(null);
       setEditingPhone(false);
       setPhoneInput('');
+      setOwnerNameInput('');
+      setLocalOwnerName(null);
     }
   }, [visible, shop]);
 
@@ -172,6 +176,7 @@ export const ShopDetailModal = memo(function ShopDetailModal({
 
   // Current phone: local override or shop prop
   const currentPhone = localPhone ?? shop?.phone ?? '';
+  const currentOwnerName = localOwnerName ?? shop?.ownerName ?? '';
 
   function handleSmsPress() {
     if (!shop) return;
@@ -234,13 +239,16 @@ export const ShopDetailModal = memo(function ShopDetailModal({
     }
     setPhoneSaving(true);
     try {
-      await ApiService.updateShopPhone(shop.id, trimmed);
+      const trimmedOwner = ownerNameInput.trim();
+      await ApiService.updateShopPhone(shop.id, trimmed, trimmedOwner || undefined);
       setLocalPhone(trimmed);
+      if (trimmedOwner) setLocalOwnerName(trimmedOwner);
       setEditingPhone(false);
       setPhoneInput('');
-      Alert.alert('Phone Updated', 'Phone number has been updated successfully.');
+      setOwnerNameInput('');
+      Alert.alert('Updated', 'Phone number and owner name have been updated successfully.');
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to update phone number. Please try again.');
+      Alert.alert('Error', e.message || 'Failed to update. Please try again.');
     } finally {
       setPhoneSaving(false);
     }
@@ -248,6 +256,7 @@ export const ShopDetailModal = memo(function ShopDetailModal({
 
   function handleEditPhone() {
     setPhoneInput(currentPhone);
+    setOwnerNameInput(currentOwnerName);
     setEditingPhone(true);
   }
 
@@ -275,7 +284,7 @@ export const ShopDetailModal = memo(function ShopDetailModal({
             </View>
             <View style={styles.headerInfo}>
               <Text style={styles.shopName} numberOfLines={1}>{shop.name}</Text>
-              <Text style={styles.owner}>{shop.ownerName}</Text>
+              <Text style={styles.owner}>{currentOwnerName || shop.ownerName}</Text>
             </View>
             <Pressable onPress={onClose} style={styles.closeBtn} hitSlop={12}>
               <MaterialIcons name="close" size={22} color={Colors.textSecondary} />
@@ -607,9 +616,27 @@ export const ShopDetailModal = memo(function ShopDetailModal({
                 <View style={styles.phoneEditIconWrap}>
                   <MaterialIcons name="phone" size={22} color="#2563EB" />
                 </View>
-                <Text style={styles.phoneEditTitle}>Edit Phone Number</Text>
+                <Text style={styles.phoneEditTitle}>Edit Phone & Owner</Text>
                 <Text style={styles.phoneEditSubtitle}>{shop.name}</Text>
               </View>
+              {/* Owner Name Input */}
+              <View style={styles.phoneEditInputWrap}>
+                <MaterialIcons name="person" size={18} color={Colors.textMuted} />
+                <TextInput
+                  style={styles.phoneEditInput}
+                  value={ownerNameInput}
+                  onChangeText={setOwnerNameInput}
+                  placeholder="Owner Name (e.g. Muhammad Ali)"
+                  placeholderTextColor={Colors.textMuted}
+                  maxLength={50}
+                />
+                {ownerNameInput ? (
+                  <Pressable onPress={() => setOwnerNameInput('')} hitSlop={8}>
+                    <MaterialIcons name="cancel" size={16} color={Colors.textMuted} />
+                  </Pressable>
+                ) : null}
+              </View>
+              {/* Phone Input */}
               <View style={styles.phoneEditInputWrap}>
                 <MaterialIcons name="call" size={18} color={Colors.textMuted} />
                 <TextInput
