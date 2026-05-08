@@ -207,10 +207,18 @@ export function PendingMessagesSheet({
               <MaterialIcons name="account-balance" size={18} color="#FFFFFF" />
             </View>
             <View>
-              <Text style={styles.receiptBrandName}>Al FALAH Credit System</Text>
+              <Text style={styles.receiptBrandName}>{item.companyName || 'Al FALAH Credit System'}</Text>
               <Text style={styles.receiptBrandSub}>Payment Receipt</Text>
             </View>
           </View>
+          {/* Distributor Phone */}
+          {item.distributorPhone ? (
+            <View style={styles.receiptDistPhoneRow}>
+              <MaterialIcons name="call" size={13} color="rgba(255,255,255,0.7)" />
+              <Text style={styles.receiptDistPhoneLabel}>Distributor:</Text>
+              <Text style={styles.receiptDistPhoneValue}>{item.distributorPhone}</Text>
+            </View>
+          ) : null}
           <View style={styles.receiptSep} />
           <View style={styles.receiptRow}>
             <Text style={styles.receiptRowLabel}>Shop</Text>
@@ -220,6 +228,13 @@ export function PendingMessagesSheet({
             <Text style={styles.receiptRowLabel}>Date</Text>
             <Text style={styles.receiptRowValue}>{today}</Text>
           </View>
+          {/* Orderbooker Name */}
+          {item.orderbookerName ? (
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptRowLabel}>Orderbooker</Text>
+              <Text style={styles.receiptRowValue}>{item.orderbookerName}</Text>
+            </View>
+          ) : null}
           <View style={styles.receiptAmountBox}>
             <View style={styles.receiptAmtRow}>
               <Text style={styles.receiptAmtLabel}>Opening Balance</Text>
@@ -238,7 +253,12 @@ export function PendingMessagesSheet({
           </View>
           <View style={styles.receiptThanksRow}>
             <MaterialIcons name="verified" size={12} color="#A7F3D0" />
-            <Text style={styles.receiptThanksText}>Thank you! · Al FALAH Credit System</Text>
+            <Text style={styles.receiptThanksText}>Thank you! · {item.companyName || 'Al FALAH Credit System'}</Text>
+          </View>
+          {/* Urdu Hidayat */}
+          <View style={styles.receiptHidayat}>
+            <MaterialIcons name="info" size={12} color="rgba(255,255,255,0.5)" />
+            <Text style={styles.receiptHidayatText}>کسی بھی قسم کا فرق محسوس ہو تو رابطہ کریں</Text>
           </View>
         </View>
       </View>
@@ -737,5 +757,40 @@ const styles = StyleSheet.create({
   receiptThanksText: {
     fontSize: 10,
     color: 'rgba(255,255,255,0.4)',
+  },
+  // Distributor phone row
+  receiptDistPhoneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+    zIndex: 1,
+  },
+  receiptDistPhoneLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.6)',
+    fontWeight: FontWeight.medium,
+  },
+  receiptDistPhoneValue: {
+    fontSize: 13,
+    color: '#A7F3D0',
+    fontWeight: FontWeight.bold,
+    letterSpacing: 0.3,
+  },
+  // Urdu Hidayat
+  receiptHidayat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    marginTop: 4,
+    zIndex: 1,
+  },
+  receiptHidayatText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.55)',
+    fontWeight: FontWeight.medium,
+    textAlign: 'center',
+    lineHeight: 18,
   },
 });

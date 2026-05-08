@@ -27,6 +27,9 @@ interface NotificationPayload {
   openingBalance: number;
   recoveryAmount: number;
   remainingBalance: number;
+  companyName?: string;
+  orderbookerName?: string;
+  distributorPhone?: string;
 }
 
 export type NotificationMethod = 'sms' | 'whatsapp';
@@ -258,10 +261,18 @@ export function NotificationChoice({ visible, payload, onDone }: NotificationCho
                   <MaterialIcons name="account-balance" size={22} color="#FFFFFF" />
                 </View>
                 <View>
-                  <Text style={styles.receiptTitle}>Al FALAH Credit System</Text>
+                  <Text style={styles.receiptTitle}>{payload.companyName || 'Al FALAH Credit System'}</Text>
                   <Text style={styles.receiptSub}>Payment Receipt</Text>
                 </View>
               </View>
+              {/* Distributor Phone */}
+              {payload.distributorPhone ? (
+                <View style={styles.receiptDistPhoneRow}>
+                  <MaterialIcons name="call" size={13} color="rgba(255,255,255,0.7)" />
+                  <Text style={styles.receiptDistPhoneLabel}>Distributor:</Text>
+                  <Text style={styles.receiptDistPhoneValue}>{payload.distributorPhone}</Text>
+                </View>
+              ) : null}
               <View style={styles.receiptDivider} />
               <View style={styles.receiptInfoRow}>
                 <MaterialIcons name="store" size={14} color="rgba(255,255,255,0.5)" />
@@ -273,6 +284,14 @@ export function NotificationChoice({ visible, payload, onDone }: NotificationCho
                 <Text style={styles.receiptInfoLabel}>Date:</Text>
                 <Text style={styles.receiptInfoValue}>{today}</Text>
               </View>
+              {/* Orderbooker Name */}
+              {payload.orderbookerName ? (
+                <View style={styles.receiptInfoRow}>
+                  <MaterialIcons name="person" size={14} color="rgba(255,255,255,0.5)" />
+                  <Text style={styles.receiptInfoLabel}>Orderbooker:</Text>
+                  <Text style={styles.receiptInfoValue}>{payload.orderbookerName}</Text>
+                </View>
+              ) : null}
               <View style={styles.receiptAmountBox}>
                 <View style={styles.receiptAmountRow}>
                   <Text style={styles.receiptAmountLabel}>Opening Balance</Text>
@@ -291,7 +310,12 @@ export function NotificationChoice({ visible, payload, onDone }: NotificationCho
               </View>
               <View style={styles.receiptFooterRow}>
                 <MaterialIcons name="verified" size={14} color="#A7F3D0" />
-                <Text style={styles.receiptFooterText}>Thank you! · Al FALAH Credit System</Text>
+                <Text style={styles.receiptFooterText}>Thank you! · {payload.companyName || 'Al FALAH Credit System'}</Text>
+              </View>
+              {/* Urdu Hidayat */}
+              <View style={styles.receiptHidayat}>
+                <MaterialIcons name="info" size={12} color="rgba(255,255,255,0.5)" />
+                <Text style={styles.receiptHidayatText}>کسی بھی قسم کا فرق محسوس ہو تو رابطہ کریں</Text>
               </View>
             </View>
           </View>
@@ -543,6 +567,41 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: 'rgba(255,255,255,0.4)',
     fontWeight: FontWeight.medium,
+  },
+  // Distributor phone row
+  receiptDistPhoneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+    zIndex: 1,
+  },
+  receiptDistPhoneLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.6)',
+    fontWeight: FontWeight.medium,
+  },
+  receiptDistPhoneValue: {
+    fontSize: 13,
+    color: '#A7F3D0',
+    fontWeight: FontWeight.bold,
+    letterSpacing: 0.3,
+  },
+  // Urdu Hidayat
+  receiptHidayat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    marginTop: 4,
+    zIndex: 1,
+  },
+  receiptHidayatText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.55)',
+    fontWeight: FontWeight.medium,
+    textAlign: 'center',
+    lineHeight: 18,
   },
 
   // Info card

@@ -28,6 +28,9 @@ interface RecoveryReceiptProps {
   openingBalance: number;
   recoveryAmount: number;
   remainingBalance: number;
+  companyName?: string;
+  orderbookerName?: string;
+  distributorPhone?: string;
   onClose: () => void;
 }
 
@@ -47,6 +50,9 @@ export function RecoveryReceipt({
   openingBalance,
   recoveryAmount,
   remainingBalance,
+  companyName,
+  orderbookerName,
+  distributorPhone,
   onClose,
 }: RecoveryReceiptProps) {
   const receiptRef = useRef<View>(null);
@@ -271,10 +277,19 @@ export function RecoveryReceipt({
                 <MaterialIcons name="account-balance" size={28} color="#FFFFFF" />
               </View>
               <View style={styles.receiptHeaderText}>
-                <Text style={styles.receiptBrandName}>Al FALAH Credit System</Text>
+                <Text style={styles.receiptBrandName}>{companyName || 'Al FALAH Credit System'}</Text>
                 <Text style={styles.receiptSubtitle}>Payment Receipt</Text>
               </View>
             </View>
+
+            {/* Distributor Phone */}
+            {distributorPhone ? (
+              <View style={styles.receiptDistPhoneRow}>
+                <MaterialIcons name="call" size={13} color="rgba(255,255,255,0.7)" />
+                <Text style={styles.receiptDistPhoneLabel}>Distributor:</Text>
+                <Text style={styles.receiptDistPhoneValue}>{distributorPhone}</Text>
+              </View>
+            ) : null}
 
             {/* Divider */}
             <View style={styles.receiptDivider}>
@@ -290,11 +305,20 @@ export function RecoveryReceipt({
               <Text style={styles.receiptShopName}>{shopName}</Text>
             </View>
 
-            {/* Date */}
+            {/* Date + Orderbooker */}
             <View style={styles.receiptDateRow}>
               <MaterialIcons name="calendar-today" size={14} color="rgba(255,255,255,0.5)" />
               <Text style={styles.receiptDate}>{today}</Text>
             </View>
+
+            {/* Orderbooker Name */}
+            {orderbookerName ? (
+              <View style={styles.receiptOrderbookerRow}>
+                <MaterialIcons name="person" size={14} color="rgba(255,255,255,0.5)" />
+                <Text style={styles.receiptOrderbookerLabel}>Orderbooker:</Text>
+                <Text style={styles.receiptOrderbookerValue}>{orderbookerName}</Text>
+              </View>
+            ) : null}
 
             {/* Amounts Section */}
             <View style={styles.receiptAmounts}>
@@ -336,7 +360,13 @@ export function RecoveryReceipt({
             {/* Footer */}
             <View style={styles.receiptFooter}>
               <View style={styles.receiptFooterLine} />
-              <Text style={styles.receiptFooterText}>Powered by Al FALAH Credit System</Text>
+              <Text style={styles.receiptFooterText}>Powered by {companyName || 'Al FALAH Credit System'}</Text>
+            </View>
+
+            {/* Urdu Hidayat - Fraud Warning */}
+            <View style={styles.receiptHidayat}>
+              <MaterialIcons name="info" size={12} color="rgba(255,255,255,0.5)" />
+              <Text style={styles.receiptHidayatText}>کسی بھی قسم کا فرق محسوس ہو تو رابطہ کریں</Text>
             </View>
           </View>
 
@@ -594,6 +624,60 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: 'rgba(255,255,255,0.35)',
     fontWeight: FontWeight.medium,
+  },
+  // Distributor phone row
+  receiptDistPhoneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+    zIndex: 1,
+  },
+  receiptDistPhoneLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.6)',
+    fontWeight: FontWeight.medium,
+  },
+  receiptDistPhoneValue: {
+    fontSize: 13,
+    color: '#A7F3D0',
+    fontWeight: FontWeight.bold,
+    letterSpacing: 0.3,
+  },
+  // Orderbooker row
+  receiptOrderbookerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 3,
+    zIndex: 1,
+  },
+  receiptOrderbookerLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.5)',
+    fontWeight: FontWeight.medium,
+  },
+  receiptOrderbookerValue: {
+    fontSize: 13,
+    color: '#FFFFFF',
+    fontWeight: FontWeight.semibold,
+  },
+  // Urdu Hidayat
+  receiptHidayat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    marginTop: 4,
+    paddingTop: 3,
+    zIndex: 1,
+  },
+  receiptHidayatText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.55)',
+    fontWeight: FontWeight.medium,
+    textAlign: 'center',
+    lineHeight: 18,
   },
 
   // ===== BUTTONS =====

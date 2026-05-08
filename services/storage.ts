@@ -31,6 +31,9 @@ export interface PendingNotification {
   openingBalance: number;
   recoveryAmount: number;
   remainingBalance: number;
+  companyName?: string;
+  orderbookerName?: string;
+  distributorPhone?: string;
   createdAt: string;
   date: string; // YYYY-MM-DD for daily grouping
 }

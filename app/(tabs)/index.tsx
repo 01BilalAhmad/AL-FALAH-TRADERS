@@ -83,6 +83,9 @@ export default function TodayRouteScreen() {
     openingBalance: number;
     recoveryAmount: number;
     remainingBalance: number;
+    companyName?: string;
+    orderbookerName?: string;
+    distributorPhone?: string;
   }>({ visible: false, shopId: '', shopPhone: '', shopName: '', openingBalance: 0, recoveryAmount: 0, remainingBalance: 0 });
   const [visitedShopIds, setVisitedShopIds] = useState<Set<string>>(new Set());
   const [todayRecovery, setTodayRecovery] = useState(0);
@@ -95,6 +98,9 @@ export default function TodayRouteScreen() {
     openingBalance: number;
     recoveryAmount: number;
     remainingBalance: number;
+    companyName?: string;
+    orderbookerName?: string;
+    distributorPhone?: string;
   } | null>(null);
 
   // Load cached todayRecovery on mount so it doesn't show 0 after refresh
@@ -291,6 +297,9 @@ export default function TodayRouteScreen() {
             openingBalance,
             recoveryAmount: payload.amount,
             remainingBalance,
+            companyName: user.companyName || undefined,
+            orderbookerName: user.name || undefined,
+            distributorPhone: user.phone || undefined,
             createdAt: new Date().toISOString(),
             date: getTodayDateStr(),
           };
@@ -306,6 +315,9 @@ export default function TodayRouteScreen() {
             openingBalance,
             recoveryAmount: payload.amount,
             remainingBalance,
+            companyName: user.companyName || undefined,
+            orderbookerName: user.name || undefined,
+            distributorPhone: user.phone || undefined,
           });
 
           // Fallback timeout in case SuccessOverlay doesn't dismiss properly
@@ -322,6 +334,9 @@ export default function TodayRouteScreen() {
                 openingBalance,
                 recoveryAmount: payload.amount,
                 remainingBalance,
+                companyName: user.companyName || undefined,
+                orderbookerName: user.name || undefined,
+                distributorPhone: user.phone || undefined,
               };
             });
             setPendingNotifAfterSuccess(null);
@@ -467,6 +482,9 @@ export default function TodayRouteScreen() {
       openingBalance,
       recoveryAmount,
       remainingBalance,
+      companyName: user.companyName || undefined,
+      orderbookerName: user.name || undefined,
+      distributorPhone: user.phone || undefined,
       createdAt: new Date().toISOString(),
       date: getTodayDateStr(),
     };
@@ -483,6 +501,9 @@ export default function TodayRouteScreen() {
       openingBalance,
       recoveryAmount,
       remainingBalance,
+      companyName: user.companyName || undefined,
+      orderbookerName: user.name || undefined,
+      distributorPhone: user.phone || undefined,
     });
   }, [phoneInputShop, user, lastRecoveryInfo]);
 
@@ -1183,6 +1204,9 @@ export default function TodayRouteScreen() {
           openingBalance: notifChoice.openingBalance,
           recoveryAmount: notifChoice.recoveryAmount,
           remainingBalance: notifChoice.remainingBalance,
+          companyName: notifChoice.companyName,
+          orderbookerName: notifChoice.orderbookerName,
+          distributorPhone: notifChoice.distributorPhone,
         } : null}
         onDone={(method: NotificationMethod) => {
           setNotifChoice((s) => ({ ...s, visible: false }));
