@@ -49,7 +49,7 @@ type SectionItem =
 
 export default function TodayRouteScreen() {
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, distributorPhone } = useAuth();
   const {
     todayShops,
     allShops,
@@ -299,7 +299,7 @@ export default function TodayRouteScreen() {
             remainingBalance,
             companyName: user.companyName || undefined,
             orderbookerName: user.name || undefined,
-            distributorPhone: user.phone || undefined,
+            distributorPhone: distributorPhone || undefined,
             createdAt: new Date().toISOString(),
             date: getTodayDateStr(),
           };
@@ -317,7 +317,7 @@ export default function TodayRouteScreen() {
             remainingBalance,
             companyName: user.companyName || undefined,
             orderbookerName: user.name || undefined,
-            distributorPhone: user.phone || undefined,
+            distributorPhone: distributorPhone || undefined,
           });
 
           // Fallback timeout in case SuccessOverlay doesn't dismiss properly
@@ -336,7 +336,7 @@ export default function TodayRouteScreen() {
                 remainingBalance,
                 companyName: user.companyName || undefined,
                 orderbookerName: user.name || undefined,
-                distributorPhone: user.phone || undefined,
+                distributorPhone: distributorPhone || undefined,
               };
             });
             setPendingNotifAfterSuccess(null);

@@ -11,6 +11,8 @@ export interface AuthContextType {
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   updatePhone: (phone: string) => Promise<void>;
+  distributorPhone: string | null;
+  fetchDistributorPhone: (companyId?: string) => Promise<string | null>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -19,6 +21,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [distributorPhone, setDistributorPhone] = useState<string | null>(null);
 
   useEffect(() => {
     loadSession();
@@ -33,6 +36,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (savedUser && savedToken) {
         setUser(savedUser);
         setToken(savedToken);
+        // Fetch distributor phone on session load
+        fetchDistPhone(savedUser.companyId);
       }
     } catch (e) {
       console.error('Session load error:', e);
@@ -46,6 +51,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await StorageService.saveUser(res.user, res.token);
     setUser(res.user);
     setToken(res.token);
+    // Fetch distributor phone on login
+    fetchDistPhone(res.user.companyId);
   }
 
   async function logout() {
@@ -70,8 +77,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function fetchDistPhone(companyId?: string) {
+    try {
+      const res = await ApiService.fetchDistributorPhone(companyId);
+      const phone = res.distributorPhone || null;
+      setDistributorPhone(phone);
+      return phone;
+    } catch (e) {
+      console.error('Failed to fetch distributor phone:', e);
+      return null;
+    }
+  }
+
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, logout, refreshUser, updatePhone }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, logout, refreshUser, updatePhone, distributorPhone, fetchDistributorPhone: fetchDistPhone }}>
       {children}
     </AuthContext.Provider>
   );

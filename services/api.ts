@@ -255,4 +255,12 @@ export const ApiService = {
       method: 'PATCH',
       body: JSON.stringify({ userId, phone }),
     }),
+
+  // Fetch distributor phone from company settings (for receipts)
+  fetchDistributorPhone: (companyId?: string) => {
+    const params = companyId ? `?companyId=${companyId}` : '';
+    return request<{ distributorPhone: string | null; companyName: string | null; companyId: string | null }>(`/api/companies/distributor-phone${params}`, {
+      method: 'GET',
+    });
+  },
 };
