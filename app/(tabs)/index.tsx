@@ -76,12 +76,13 @@ export default function TodayRouteScreen() {
   }>({ visible: false, shopName: '', amount: 0, isOffline: false });
   const [notifChoice, setNotifChoice] = useState<{
     visible: boolean;
+    shopId: string;
     shopPhone: string;
     shopName: string;
     openingBalance: number;
     recoveryAmount: number;
     remainingBalance: number;
-  }>({ visible: false, shopPhone: '', shopName: '', openingBalance: 0, recoveryAmount: 0, remainingBalance: 0 });
+  }>({ visible: false, shopId: '', shopPhone: '', shopName: '', openingBalance: 0, recoveryAmount: 0, remainingBalance: 0 });
   const [visitedShopIds, setVisitedShopIds] = useState<Set<string>>(new Set());
   const [todayRecovery, setTodayRecovery] = useState(0);
   const [recoverySubmittedShopIds, setRecoverySubmittedShopIds] = useState<Set<string>>(new Set());
@@ -289,6 +290,7 @@ export default function TodayRouteScreen() {
 
           setNotifChoice({
             visible: true,
+            shopId: shop.id,
             shopPhone,
             shopName,
             openingBalance,
@@ -446,6 +448,7 @@ export default function TodayRouteScreen() {
     setPhoneInputShop(null);
     setNotifChoice({
       visible: true,
+      shopId: phoneInputShop?.id || '',
       shopPhone: savedPhone,
       shopName,
       openingBalance,
@@ -1122,14 +1125,11 @@ export default function TodayRouteScreen() {
         } : null}
         onDone={(method: NotificationMethod) => {
           setNotifChoice((s) => ({ ...s, visible: false }));
-          if (method === 'sms') {
-            setSmsSentCount((c) => c + 1);
-            StorageService.incrementNotifCount('sms');
-          }
-          else if (method === 'whatsapp') {
-            setWhatsappSentCount((c) => c + 1);
-            StorageService.incrementNotifCount('whatsapp');
-          }
+          // Increment count (unique per shop via StorageService)
+          StorageService.incrementNotifCount(method, notifChoice.shopId || undefined).then((counts) => {
+            setSmsSentCount(counts.sms);
+            setWhatsappSentCount(counts.whatsapp);
+          });
           StorageService.getPendingNotifications(getTodayDateStr()).then((list) => {
             const entry = list.find((n) => n.shopName === notifChoice.shopName);
             if (entry) {

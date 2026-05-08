@@ -1,8 +1,7 @@
 // Powered by OnSpace.AI
 // Recovery Receipt — renders as a solid View (no LinearGradient) so captureRef works.
-// After capturing as image, it's shared to shopkeeper via WhatsApp.
-// Strategy: Open WhatsApp chat directly to the shopkeeper's number,
-// then save receipt to gallery so OB can attach it (non-editable, fraud-proof).
+// After capturing as image, it's saved to gallery and shared to shopkeeper via WhatsApp.
+// Receipt image persists so it can be re-sent later.
 import React, { useRef, useState, useEffect } from 'react';
 import {
   View,
@@ -18,7 +17,6 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { captureRef } from 'react-native-view-shot';
 import * as Linking from 'expo-linking';
-import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import { formatPKR } from '@/utils/format';
 import { Spacing, Radius, FontSize, FontWeight, Shadow } from '@/constants/theme';
@@ -53,12 +51,16 @@ export function RecoveryReceipt({
 }: RecoveryReceiptProps) {
   const receiptRef = useRef<View>(null);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [savedImageUri, setSavedImageUri] = useState<string | null>(null);
+  const [imageSavedToGallery, setImageSavedToGallery] = useState(false);
   const scale = useRef(new Animated.Value(0.9)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (visible) {
       setIsCapturing(false);
+      setSavedImageUri(null);
+      setImageSavedToGallery(false);
       Animated.parallel([
         Animated.spring(scale, { toValue: 1, useNativeDriver: true, tension: 80, friction: 10 }),
         Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }),
@@ -76,62 +78,72 @@ export function RecoveryReceipt({
   });
 
   /**
-   * Send receipt to WhatsApp:
-   * 1. Capture receipt as image
-   * 2. Save image to device Gallery
-   * 3. Open WhatsApp chat directly to shopkeeper's number
-   * 4. OB taps attachment (📎) → Gallery → selects receipt → Send
-   * 
-   * This is the ONLY reliable way to send image to a specific WhatsApp number.
-   * Image is non-editable = fraud-proof.
+   * Capture receipt as image and save to gallery.
+   * Returns the gallery URI if successful.
+   */
+  const captureAndSaveToGallery = async (): Promise<string | null> => {
+    if (!receiptRef.current) return null;
+
+    // Wait for UI to render
+    await new Promise(r => setTimeout(r, 300));
+
+    // Step 1: Capture receipt as image
+    const imageUri = await captureRef(receiptRef, {
+      format: 'png',
+      quality: 1.0,
+      result: 'tmpfile',
+    });
+
+    if (!imageUri) {
+      throw new Error('Image capture returned empty URI');
+    }
+
+    console.log('[RecoveryReceipt] Image captured at:', imageUri);
+
+    // Step 2: Save image to device Gallery
+    let savedAssetUri: string | null = null;
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status === 'granted') {
+        const asset = await MediaLibrary.createAssetAsync(imageUri);
+        // Create album for easy access
+        try {
+          await MediaLibrary.createAlbumAsync('AlFalah Receipts', asset, false);
+        } catch {
+          try {
+            const album = await MediaLibrary.getAlbumAsync('AlFalah Receipts');
+            if (album) {
+              await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+            }
+          } catch {}
+        }
+        savedAssetUri = asset.uri;
+        setImageSavedToGallery(true);
+        console.log('[RecoveryReceipt] Image saved to gallery:', asset.uri);
+      } else {
+        console.warn('[RecoveryReceipt] MediaLibrary permission denied');
+      }
+    } catch (galleryErr) {
+      console.warn('[RecoveryReceipt] Could not save to gallery:', galleryErr);
+    }
+
+    return savedAssetUri || imageUri;
+  };
+
+  /**
+   * First-time send: capture image, save to gallery, open WhatsApp
    */
   const handleShareImage = async () => {
     if (isCapturing) return;
     setIsCapturing(true);
 
     try {
-      // Wait for UI to render
-      await new Promise(r => setTimeout(r, 300));
-
-      // Step 1: Capture receipt as image
-      const imageUri = await captureRef(receiptRef, {
-        format: 'png',
-        quality: 1.0,
-        result: 'tmpfile',
-      });
-
-      if (!imageUri) {
-        throw new Error('Image capture returned empty URI');
+      const uri = await captureAndSaveToGallery();
+      if (uri) {
+        setSavedImageUri(uri);
       }
 
-      console.log('[RecoveryReceipt] Image captured at:', imageUri);
-
-      // Step 2: Save image to device Gallery
-      let savedToGallery = false;
-      try {
-        const { status } = await MediaLibrary.requestPermissionsAsync();
-        if (status === 'granted') {
-          const asset = await MediaLibrary.createAssetAsync(imageUri);
-          // Create album for easy access
-          try {
-            await MediaLibrary.createAlbumAsync('AlFalah Receipts', asset, false);
-          } catch {
-            // Album might already exist, try adding to it
-            try {
-              const album = await MediaLibrary.getAlbumAsync('AlFalah Receipts');
-              if (album) {
-                await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
-              }
-            } catch {}
-          }
-          savedToGallery = true;
-          console.log('[RecoveryReceipt] Image saved to gallery:', asset.uri);
-        }
-      } catch (galleryErr) {
-        console.warn('[RecoveryReceipt] Could not save to gallery:', galleryErr);
-      }
-
-      // Step 3: Open WhatsApp chat directly to shopkeeper's number
+      // Open WhatsApp chat directly to shopkeeper's number
       if (shopPhone) {
         const phone = formatPhoneIntl(shopPhone);
         const whatsappUrl = `https://wa.me/${phone}`;
@@ -139,17 +151,16 @@ export function RecoveryReceipt({
         if (canOpen) {
           await Linking.openURL(whatsappUrl);
 
-          // Step 4: Show instruction
-          if (savedToGallery) {
+          if (imageSavedToGallery) {
             Alert.alert(
-              '✅ Receipt Ready!',
-              `Receipt saved in Gallery!\n\nWhatsApp chat opened for ${shopName}.\n\n📎 Tap attachment button → Gallery → "AlFalah Receipts" → Select receipt → Send`,
+              'Receipt Ready!',
+              `Receipt saved in Gallery (AlFalah Receipts)!\n\nWhatsApp chat opened for ${shopName}.\n\nTap attachment → Gallery → Select receipt → Send`,
               [{ text: 'OK' }]
             );
           } else {
             Alert.alert(
               'Receipt Ready',
-              `WhatsApp chat opened for ${shopName}.\n\n📎 Attach the receipt image from your Gallery to send it.`,
+              `WhatsApp chat opened for ${shopName}.\n\nAttach the receipt image from your Gallery to send it.`,
               [{ text: 'OK' }]
             );
           }
@@ -161,24 +172,43 @@ export function RecoveryReceipt({
       }
     } catch (error: any) {
       console.error('[RecoveryReceipt] Share failed:', error);
-
-      // Fallback: Just open WhatsApp chat
       if (shopPhone) {
         const phone = formatPhoneIntl(shopPhone);
         Alert.alert(
           'Image Error',
           'Receipt image save nahi hua. WhatsApp chat kholen?',
           [
-            {
-              text: 'WhatsApp Kholo',
-              onPress: () => Linking.openURL(`https://wa.me/${phone}`),
-            },
+            { text: 'WhatsApp Kholo', onPress: () => Linking.openURL(`https://wa.me/${phone}`) },
             { text: 'Cancel', style: 'cancel' },
           ]
         );
       }
     } finally {
       setIsCapturing(false);
+    }
+  };
+
+  /**
+   * Re-send: open WhatsApp directly (image already saved in gallery)
+   */
+  const handleResend = async () => {
+    if (!shopPhone) {
+      Alert.alert('No Phone Number', 'This shop has no phone number for WhatsApp.');
+      return;
+    }
+
+    const phone = formatPhoneIntl(shopPhone);
+    const whatsappUrl = `https://wa.me/${phone}`;
+    const canOpen = await Linking.canOpenURL(whatsappUrl);
+    if (canOpen) {
+      await Linking.openURL(whatsappUrl);
+      Alert.alert(
+        'WhatsApp Opened',
+        `WhatsApp chat opened for ${shopName}.\n\nTap attachment → Gallery → "AlFalah Receipts" → Select receipt → Send`,
+        [{ text: 'OK' }]
+      );
+    } else {
+      Alert.alert('WhatsApp Not Available', 'Please install WhatsApp.');
     }
   };
 
@@ -197,10 +227,7 @@ export function RecoveryReceipt({
             <MaterialIcons name="close" size={20} color="rgba(255,255,255,0.8)" />
           </Pressable>
 
-          {/* ============================================= */}
-          {/* RECEIPT — solid bg, NO LinearGradient          */}
-          {/* so captureRef can capture it as image properly */}
-          {/* ============================================= */}
+          {/* RECEIPT — solid bg so captureRef works */}
           <View ref={receiptRef} collapsable={false} style={styles.receipt}>
             {/* Top gradient overlay */}
             <View style={styles.receiptGradientTop} />
@@ -208,7 +235,7 @@ export function RecoveryReceipt({
             {/* Brand Header */}
             <View style={styles.receiptHeader}>
               <View style={styles.receiptLogoWrap}>
-                <MaterialIcons name="account-balance" size={30} color="#FFFFFF" />
+                <MaterialIcons name="account-balance" size={28} color="#FFFFFF" />
               </View>
               <View style={styles.receiptHeaderText}>
                 <Text style={styles.receiptBrandName}>Al FALAH Credit System</Text>
@@ -225,14 +252,14 @@ export function RecoveryReceipt({
 
             {/* Shop Name */}
             <View style={styles.receiptShopRow}>
-              <MaterialIcons name="store" size={20} color="rgba(255,255,255,0.6)" />
+              <MaterialIcons name="store" size={18} color="rgba(255,255,255,0.6)" />
               <Text style={styles.receiptShopLabel}>Shop</Text>
               <Text style={styles.receiptShopName}>{shopName}</Text>
             </View>
 
             {/* Date */}
             <View style={styles.receiptDateRow}>
-              <MaterialIcons name="calendar-today" size={16} color="rgba(255,255,255,0.5)" />
+              <MaterialIcons name="calendar-today" size={14} color="rgba(255,255,255,0.5)" />
               <Text style={styles.receiptDate}>{today}</Text>
             </View>
 
@@ -261,7 +288,7 @@ export function RecoveryReceipt({
                 <Text style={[styles.receiptAmountLabel, { fontWeight: FontWeight.bold, color: '#FFFFFF' }]}>
                   Remaining Balance
                 </Text>
-                <Text style={[styles.receiptAmountValue, { color: '#FDE68A', fontSize: 24 }]}>
+                <Text style={[styles.receiptAmountValue, { color: '#FDE68A', fontSize: 22 }]}>
                   {formatPKR(remainingBalance)}
                 </Text>
               </View>
@@ -269,7 +296,7 @@ export function RecoveryReceipt({
 
             {/* Thank You */}
             <View style={styles.receiptThankYou}>
-              <MaterialIcons name="verified" size={18} color="#A7F3D0" />
+              <MaterialIcons name="verified" size={16} color="#A7F3D0" />
               <Text style={styles.receiptThankText}>Thank you for your payment!</Text>
             </View>
 
@@ -280,26 +307,55 @@ export function RecoveryReceipt({
             </View>
           </View>
 
-          {/* Share to WhatsApp Button */}
-          <Pressable
-            style={[styles.shareBtn, isCapturing && styles.shareBtnDisabled]}
-            onPress={handleShareImage}
-            disabled={isCapturing}
-          >
-            <View style={[styles.shareBtnInner, isCapturing && styles.shareBtnInnerDisabled]}>
-              {isCapturing ? (
-                <>
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                  <Text style={styles.shareBtnText}>Saving Receipt...</Text>
-                </>
-              ) : (
-                <>
-                  <MaterialIcons name="chat" size={22} color="#FFFFFF" />
-                  <Text style={styles.shareBtnText}>Send Receipt to WhatsApp</Text>
-                </>
-              )}
+          {/* Buttons Row */}
+          <View style={styles.buttonsRow}>
+            {/* Save / Resend WhatsApp Button */}
+            {savedImageUri ? (
+              <Pressable
+                style={styles.resendBtn}
+                onPress={handleResend}
+              >
+                <View style={styles.resendBtnInner}>
+                  <MaterialIcons name="chat" size={20} color="#FFFFFF" />
+                  <Text style={styles.resendBtnText}>Re-send WhatsApp</Text>
+                </View>
+              </Pressable>
+            ) : null}
+
+            {/* Primary Send Button */}
+            <Pressable
+              style={[styles.shareBtn, isCapturing && styles.shareBtnDisabled]}
+              onPress={handleShareImage}
+              disabled={isCapturing}
+            >
+              <View style={[styles.shareBtnInner, isCapturing && styles.shareBtnInnerDisabled]}>
+                {isCapturing ? (
+                  <>
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                    <Text style={styles.shareBtnText}>Saving...</Text>
+                  </>
+                ) : savedImageUri ? (
+                  <>
+                    <MaterialIcons name="save" size={20} color="#FFFFFF" />
+                    <Text style={styles.shareBtnText}>Save Again</Text>
+                  </>
+                ) : (
+                  <>
+                    <MaterialIcons name="chat" size={22} color="#FFFFFF" />
+                    <Text style={styles.shareBtnText}>Send Receipt</Text>
+                  </>
+                )}
+              </View>
+            </Pressable>
+          </View>
+
+          {/* Gallery saved indicator */}
+          {imageSavedToGallery ? (
+            <View style={styles.savedIndicator}>
+              <MaterialIcons name="check-circle" size={14} color="#A7F3D0" />
+              <Text style={styles.savedText}>Receipt saved in Gallery (AlFalah Receipts)</Text>
             </View>
-          </Pressable>
+          ) : null}
         </Animated.View>
       </View>
     </Modal>
@@ -340,7 +396,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // ===== RECEIPT (Solid bg for captureRef) =====
+  // ===== RECEIPT =====
   receipt: {
     borderRadius: Radius.xl,
     padding: 14,
@@ -357,8 +413,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(5,150,105,0.5)',
     borderRadius: Radius.xl,
   },
-
-  // Header
   receiptHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -391,8 +445,6 @@ const styles = StyleSheet.create({
     marginTop: 1,
     fontWeight: FontWeight.medium,
   },
-
-  // Divider
   receiptDivider: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -412,8 +464,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.3)',
     transform: [{ rotate: '45deg' }],
   },
-
-  // Shop
   receiptShopRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -433,8 +483,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     textAlign: 'right',
   },
-
-  // Date
   receiptDateRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -447,8 +495,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.6)',
     fontWeight: FontWeight.medium,
   },
-
-  // Amounts
   receiptAmounts: {
     backgroundColor: 'rgba(0,0,0,0.2)',
     borderRadius: Radius.lg,
@@ -465,12 +511,12 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   receiptAmountLabel: {
-    fontSize: 15,
+    fontSize: 14,
     color: 'rgba(255,255,255,0.7)',
     fontWeight: FontWeight.medium,
   },
   receiptAmountValue: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: FontWeight.bold,
     color: '#FFFFFF',
   },
@@ -486,8 +532,6 @@ const styles = StyleSheet.create({
     borderRadius: Radius.sm,
     marginTop: 2,
   },
-
-  // Thank You
   receiptThankYou: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -497,12 +541,10 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   receiptThankText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#A7F3D0',
     fontWeight: FontWeight.semibold,
   },
-
-  // Footer
   receiptFooter: {
     alignItems: 'center',
     zIndex: 1,
@@ -520,9 +562,14 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.medium,
   },
 
-  // Share Button
-  shareBtn: {
+  // ===== BUTTONS =====
+  buttonsRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
     marginTop: Spacing.md,
+  },
+  shareBtn: {
+    flex: 1,
     borderRadius: Radius.md,
     overflow: 'hidden',
     ...Shadow.md,
@@ -535,15 +582,46 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.sm,
-    paddingVertical: 16,
-    backgroundColor: '#25D366', // WhatsApp green
+    paddingVertical: 14,
+    backgroundColor: '#25D366',
   },
   shareBtnInnerDisabled: {
     backgroundColor: '#4B5563',
   },
   shareBtnText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: FontWeight.bold,
     color: '#FFFFFF',
+  },
+  resendBtn: {
+    borderRadius: Radius.md,
+    overflow: 'hidden',
+    ...Shadow.md,
+  },
+  resendBtnInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: '#1D4ED8',
+  },
+  resendBtnText: {
+    fontSize: 14,
+    fontWeight: FontWeight.bold,
+    color: '#FFFFFF',
+  },
+  savedIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: Spacing.sm,
+  },
+  savedText: {
+    fontSize: 12,
+    color: '#A7F3D0',
+    fontWeight: FontWeight.medium,
   },
 });

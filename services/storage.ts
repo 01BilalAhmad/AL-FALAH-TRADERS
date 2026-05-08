@@ -17,6 +17,7 @@ const KEYS = {
   VISIT_STREAKS: 'af_visit_streaks',
   TODAY_RECOVERY: 'af_today_recovery',
   NOTIF_COUNTS: 'af_notif_counts',
+  NOTIF_SHOPS: 'af_notif_shops', // track unique shop IDs for SMS/WhatsApp
   VISITED_SHOPS: 'af_visited_shops',
   RECOVERY_SUBMITTED_SHOPS: 'af_recovery_submitted_shops',
 };
@@ -399,10 +400,13 @@ export const StorageService = {
     }
   },
 
-  incrementNotifCount: async (method: 'sms' | 'whatsapp'): Promise<{ sms: number; whatsapp: number }> => {
+  incrementNotifCount: async (method: 'sms' | 'whatsapp', shopId?: string): Promise<{ sms: number; whatsapp: number }> => {
     try {
       const raw = await AsyncStorage.getItem(KEYS.NOTIF_COUNTS);
+      const shopsRaw = await AsyncStorage.getItem(KEYS.NOTIF_SHOPS);
       let entry: { date: string; sms: number; whatsapp: number };
+      let shopsEntry: { date: string; smsShops: string[]; whatsappShops: string[] };
+
       if (!raw) {
         entry = { date: getTodayDateStr(), sms: 0, whatsapp: 0 };
       } else {
@@ -411,8 +415,30 @@ export const StorageService = {
           entry = { date: getTodayDateStr(), sms: 0, whatsapp: 0 };
         }
       }
-      entry[method] = (entry[method] || 0) + 1;
+
+      if (!shopsRaw) {
+        shopsEntry = { date: getTodayDateStr(), smsShops: [], whatsappShops: [] };
+      } else {
+        shopsEntry = JSON.parse(shopsRaw);
+        if (shopsEntry.date !== getTodayDateStr()) {
+          shopsEntry = { date: getTodayDateStr(), smsShops: [], whatsappShops: [] };
+        }
+      }
+
+      // Only increment count if this shop hasn't been counted before for this method
+      if (shopId) {
+        const shopKey = method === 'sms' ? 'smsShops' : 'whatsappShops';
+        if (!shopsEntry[shopKey].includes(shopId)) {
+          shopsEntry[shopKey].push(shopId);
+          entry[method] = (entry[method] || 0) + 1;
+        }
+      } else {
+        // Fallback: no shopId, just increment
+        entry[method] = (entry[method] || 0) + 1;
+      }
+
       await AsyncStorage.setItem(KEYS.NOTIF_COUNTS, JSON.stringify(entry));
+      await AsyncStorage.setItem(KEYS.NOTIF_SHOPS, JSON.stringify(shopsEntry));
       return { sms: entry.sms, whatsapp: entry.whatsapp };
     } catch {
       return { sms: 0, whatsapp: 0 };

@@ -26,5 +26,5 @@ export const DAY_LABELS: Record<string, string> = {
 };
 
 export const QUICK_AMOUNTS = [500, 1000, 2000, 5000, 10000];
-export const MIN_RECOVERY = 100;
+export const MIN_RECOVERY = 1;
 export const MAX_RECOVERY = 500000;
