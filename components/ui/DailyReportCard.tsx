@@ -59,7 +59,7 @@ export function DailyReportCard({
       ``,
       `🏪 Shops: ${shopsVisited}/${totalShops} visited (${visitPct}%)`,
       `💰 Recovery: ${formatPKR(totalRecovery)}`,
-      `📩 SMS: ${smsSent} | WhatsApp: ${whatsappSent}`,
+      `📩 SMS Shops: ${smsSent} | WA Shops: ${whatsappSent}`,
       pendingMessages > 0 ? `⚠️ ${pendingMessages} pending` : '',
       ``,
       `_Powered by Al FALAH Credit System_`,
@@ -219,7 +219,7 @@ export function DailyReportCard({
                     <MaterialIcons name="sms" size={22} color="#93C5FD" />
                   </View>
                   <Text style={styles.statBlockValue}>{smsSent}</Text>
-                  <Text style={styles.statBlockLabel}>SMS Sent</Text>
+                  <Text style={styles.statBlockLabel}>SMS Shops</Text>
                 </View>
 
                 <View style={styles.statBlock}>
@@ -227,7 +227,7 @@ export function DailyReportCard({
                     <MaterialIcons name="chat" size={22} color="#86EFAC" />
                   </View>
                   <Text style={styles.statBlockValue}>{whatsappSent}</Text>
-                  <Text style={styles.statBlockLabel}>WhatsApp</Text>
+                  <Text style={styles.statBlockLabel}>WA Shops</Text>
                 </View>
 
                 <View style={styles.statBlock}>
@@ -235,7 +235,7 @@ export function DailyReportCard({
                     <MaterialIcons name="notifications-active" size={22} color="#FDE68A" />
                   </View>
                   <Text style={styles.statBlockValue}>{totalMessages}</Text>
-                  <Text style={styles.statBlockLabel}>Total Sent</Text>
+                  <Text style={styles.statBlockLabel}>Total Shops</Text>
                 </View>
 
                 <View style={styles.statBlock}>
@@ -341,7 +341,8 @@ const styles = StyleSheet.create({
   // ===== REPORT CARD (Solid bg for captureRef) =====
   card: {
     borderRadius: Radius.xl,
-    padding: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
     backgroundColor: '#1D4ED8',
     overflow: 'hidden',
     ...Shadow.lg,
@@ -351,7 +352,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 150,
+    height: 80,
     backgroundColor: 'rgba(5,150,105,0.5)',
     borderRadius: Radius.xl,
   },
@@ -360,7 +361,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 80,
+    height: 40,
     backgroundColor: 'rgba(0,0,0,0.15)',
     borderRadius: Radius.xl,
   },
@@ -447,7 +448,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.25)',
     borderRadius: Radius.lg,
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
     marginBottom: Spacing.md,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.1)',
@@ -493,7 +495,7 @@ const styles = StyleSheet.create({
     gap: 14,
     backgroundColor: 'rgba(250,204,21,0.12)',
     borderRadius: Radius.lg,
-    paddingVertical: 18,
+    paddingVertical: 12,
     paddingHorizontal: 18,
     marginBottom: Spacing.md,
     borderWidth: 1.5,

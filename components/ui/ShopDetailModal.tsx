@@ -33,6 +33,8 @@ interface ShopDetailModalProps {
   companyId?: string;
   onClose: () => void;
   onCollect: () => void;
+  hasRecoveryToday?: boolean; // Whether recovery was submitted for this shop today
+  onResendReceipt?: () => void; // Callback to resend receipt
 }
 
 export const ShopDetailModal = memo(function ShopDetailModal({
@@ -41,6 +43,8 @@ export const ShopDetailModal = memo(function ShopDetailModal({
   companyId,
   onClose,
   onCollect,
+  hasRecoveryToday,
+  onResendReceipt,
 }: ShopDetailModalProps) {
   const [recentTxns, setRecentTxns] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(false);
@@ -560,15 +564,35 @@ export const ShopDetailModal = memo(function ShopDetailModal({
             <View style={{ height: Spacing.sm }} />
           </ScrollView>
 
-          {/* Collect button */}
+          {/* Collect button / Resend Receipt */}
           <View style={styles.footer}>
-            <Pressable
-              style={({ pressed }) => [styles.collectBtn, pressed && styles.collectBtnPressed]}
-              onPress={() => { onClose(); onCollect(); }}
-            >
-              <MaterialIcons name="payments" size={20} color={Colors.textInverse} />
-              <Text style={styles.collectBtnText}>Collect Recovery</Text>
-            </Pressable>
+            {/* Always show Resend if shop has phone and recovery was done today */}
+            {onResendReceipt && currentPhone ? (
+              <View style={styles.footerButtonsRow}>
+                <Pressable
+                  style={({ pressed }) => [styles.collectBtn, { flex: 1 }, pressed && styles.collectBtnPressed]}
+                  onPress={() => { onClose(); onCollect(); }}
+                >
+                  <MaterialIcons name="payments" size={20} color={Colors.textInverse} />
+                  <Text style={styles.collectBtnText}>Collect</Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [styles.resendBtn, pressed && styles.collectBtnPressed]}
+                  onPress={onResendReceipt}
+                >
+                  <MaterialIcons name="chat" size={20} color="#FFFFFF" />
+                  <Text style={styles.collectBtnText}>Resend Receipt</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <Pressable
+                style={({ pressed }) => [styles.collectBtn, pressed && styles.collectBtnPressed]}
+                onPress={() => { onClose(); onCollect(); }}
+              >
+                <MaterialIcons name="payments" size={20} color={Colors.textInverse} />
+                <Text style={styles.collectBtnText}>Collect Recovery</Text>
+              </Pressable>
+            )}
           </View>
         </View>
 
@@ -971,6 +995,20 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   collectBtnPressed: { opacity: 0.85 },
+  footerButtonsRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  resendBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    backgroundColor: '#25D366',
+    borderRadius: Radius.md,
+    paddingVertical: 16,
+  },
   collectBtnText: {
     fontSize: FontSize.md,
     fontWeight: FontWeight.bold,

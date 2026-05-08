@@ -9,6 +9,7 @@ import {
   Alert,
   TextInput,
   Pressable,
+  Linking,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -87,6 +88,14 @@ export default function TodayRouteScreen() {
   const [todayRecovery, setTodayRecovery] = useState(0);
   const [recoverySubmittedShopIds, setRecoverySubmittedShopIds] = useState<Set<string>>(new Set());
   const [phoneInputShop, setPhoneInputShop] = useState<Shop | null>(null);
+  const [pendingNotifAfterSuccess, setPendingNotifAfterSuccess] = useState<{
+    shopId: string;
+    shopPhone: string;
+    shopName: string;
+    openingBalance: number;
+    recoveryAmount: number;
+    remainingBalance: number;
+  } | null>(null);
 
   // Load cached todayRecovery on mount so it doesn't show 0 after refresh
   useEffect(() => {
@@ -288,15 +297,35 @@ export default function TodayRouteScreen() {
           await StorageService.addPendingNotification(pendingNotif);
           loadPendingNotifications();
 
-          setNotifChoice({
-            visible: true,
-            shopId: shop.id,
+          // Store pending notification data — will be shown when SuccessOverlay dismisses
+          // This is more reliable than setTimeout which can be interrupted
+          setPendingNotifAfterSuccess({
+            shopId,
             shopPhone,
             shopName,
             openingBalance,
             recoveryAmount: payload.amount,
             remainingBalance,
           });
+
+          // Fallback timeout in case SuccessOverlay doesn't dismiss properly
+          // This ensures the SMS popup always shows even if overlay has issues
+          setTimeout(() => {
+            setNotifChoice((prev) => {
+              // Only set if not already visible (avoid double-show)
+              if (prev.visible) return prev;
+              return {
+                visible: true,
+                shopId: shopId,
+                shopPhone,
+                shopName,
+                openingBalance,
+                recoveryAmount: payload.amount,
+                remainingBalance,
+              };
+            });
+            setPendingNotifAfterSuccess(null);
+          }, 4000);
         } else {
           // No phone number — show phone input popup to add number
           // After saving, NotificationChoice will be shown automatically
@@ -1096,6 +1125,28 @@ export default function TodayRouteScreen() {
           setRecoveryShop(detailShop);
           setDetailShop(null);
         }}
+        hasRecoveryToday={detailShop ? recoverySubmittedShopIds.has(detailShop.id) : false}
+        onResendReceipt={() => {
+          if (!detailShop || !detailShop.phone) {
+            Alert.alert('No Phone Number', 'This shop has no phone number for WhatsApp.');
+            return;
+          }
+          // Open WhatsApp chat directly to resend receipt from gallery
+          let formattedPhone = detailShop.phone.trim().replace(/[^0-9]/g, '');
+          if (formattedPhone.startsWith('0')) formattedPhone = formattedPhone.substring(1);
+          if (!formattedPhone.startsWith('92')) formattedPhone = '92' + formattedPhone;
+          formattedPhone = formattedPhone.replace(/[^0-9]/g, '');
+          const whatsappUrl = `https://wa.me/${formattedPhone}`;
+          Linking.openURL(whatsappUrl).then(() => {
+            Alert.alert(
+              'WhatsApp Opened',
+              `WhatsApp chat opened for ${detailShop.name}.\n\nTap attachment → Gallery → "AlFalah Receipts" → Select receipt → Send`,
+              [{ text: 'OK' }]
+            );
+          }).catch(() => {
+            Alert.alert('WhatsApp Not Available', 'Please install WhatsApp.');
+          });
+        }}
       />
 
       {/* Phone Input Modal - shows when shop has no phone after recovery */}
@@ -1111,7 +1162,17 @@ export default function TodayRouteScreen() {
         shopName={successState.shopName}
         amount={successState.amount}
         isOffline={successState.isOffline}
-        onDismiss={() => setSuccessState((s) => ({ ...s, visible: false }))}
+        onDismiss={() => {
+          setSuccessState((s) => ({ ...s, visible: false }));
+          // Show SMS popup immediately when success overlay dismisses
+          if (pendingNotifAfterSuccess) {
+            setNotifChoice({
+              visible: true,
+              ...pendingNotifAfterSuccess,
+            });
+            setPendingNotifAfterSuccess(null);
+          }
+        }}
         onUndo={handleUndoRecovery}
       />
       <NotificationChoice
@@ -1154,14 +1215,28 @@ export default function TodayRouteScreen() {
         visible={showPending}
         pendingList={pendingNotifications}
         onSendSms={(id) => {
+          // Find the shopId from the pending notification for dedup
+          const entry = pendingNotifications.find((n) => n.id === id);
+          const shopId = entry?.shopId;
           StorageService.removePendingNotification(id);
           loadPendingNotifications();
-          setSmsSentCount((c) => c + 1);
+          // Use incrementNotifCount for proper dedup (unique shops only)
+          StorageService.incrementNotifCount('sms', shopId).then((counts) => {
+            setSmsSentCount(counts.sms);
+            setWhatsappSentCount(counts.whatsapp);
+          });
         }}
         onSendWhatsapp={(id) => {
+          // Find the shopId from the pending notification for dedup
+          const entry = pendingNotifications.find((n) => n.id === id);
+          const shopId = entry?.shopId;
           StorageService.removePendingNotification(id);
           loadPendingNotifications();
-          setWhatsappSentCount((c) => c + 1);
+          // Use incrementNotifCount for proper dedup (unique shops only)
+          StorageService.incrementNotifCount('whatsapp', shopId).then((counts) => {
+            setSmsSentCount(counts.sms);
+            setWhatsappSentCount(counts.whatsapp);
+          });
         }}
         onClose={() => setShowPending(false)}
         onRefresh={loadPendingNotifications}

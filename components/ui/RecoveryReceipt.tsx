@@ -84,15 +84,21 @@ export function RecoveryReceipt({
   const captureAndSaveToGallery = async (): Promise<string | null> => {
     if (!receiptRef.current) return null;
 
-    // Wait for UI to render
-    await new Promise(r => setTimeout(r, 300));
+    // Wait for UI to fully render
+    await new Promise(r => setTimeout(r, 800));
 
     // Step 1: Capture receipt as image
-    const imageUri = await captureRef(receiptRef, {
-      format: 'png',
-      quality: 1.0,
-      result: 'tmpfile',
-    });
+    let imageUri: string;
+    try {
+      imageUri = await captureRef(receiptRef, {
+        format: 'png',
+        quality: 1.0,
+        result: 'tmpfile',
+      });
+    } catch (captureErr) {
+      console.error('[RecoveryReceipt] captureRef failed:', captureErr);
+      throw new Error('Failed to capture receipt image');
+    }
 
     if (!imageUri) {
       throw new Error('Image capture returned empty URI');
@@ -100,12 +106,24 @@ export function RecoveryReceipt({
 
     console.log('[RecoveryReceipt] Image captured at:', imageUri);
 
+    // Ensure URI has file:// prefix for MediaLibrary
+    const normalizedUri = imageUri.startsWith('file://') ? imageUri : `file://${imageUri}`;
+
     // Step 2: Save image to device Gallery
     let savedAssetUri: string | null = null;
     try {
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status === 'granted') {
-        const asset = await MediaLibrary.createAssetAsync(imageUri);
+      // Request permissions — try with full access first, fallback to writeOnly
+      let permResult = await MediaLibrary.requestPermissionsAsync(false); // false = full access
+      console.log('[RecoveryReceipt] MediaLibrary permission status (full):', permResult.status);
+      
+      // If full access denied, try writeOnly (Android 13+)
+      if (permResult.status !== 'granted') {
+        permResult = await MediaLibrary.requestPermissionsAsync(true); // true = writeOnly
+        console.log('[RecoveryReceipt] MediaLibrary permission status (writeOnly):', permResult.status);
+      }
+
+      if (permResult.status === 'granted') {
+        const asset = await MediaLibrary.createAssetAsync(normalizedUri);
         // Create album for easy access
         try {
           await MediaLibrary.createAlbumAsync('AlFalah Receipts', asset, false);
@@ -120,11 +138,26 @@ export function RecoveryReceipt({
         savedAssetUri = asset.uri;
         setImageSavedToGallery(true);
         console.log('[RecoveryReceipt] Image saved to gallery:', asset.uri);
+      } else if (permResult.status === 'limited') {
+        // Limited access - try to save anyway
+        try {
+          const asset = await MediaLibrary.createAssetAsync(normalizedUri);
+          savedAssetUri = asset.uri;
+          setImageSavedToGallery(true);
+          console.log('[RecoveryReceipt] Image saved with limited access:', asset.uri);
+        } catch (limitedErr) {
+          console.warn('[RecoveryReceipt] Could not save even with limited access:', limitedErr);
+        }
       } else {
-        console.warn('[RecoveryReceipt] MediaLibrary permission denied');
+        console.warn('[RecoveryReceipt] MediaLibrary permission denied, status:', permResult.status);
+        Alert.alert(
+          'Gallery Permission Needed',
+          'Please allow gallery access to save receipt images. You can still send via WhatsApp.',
+          [{ text: 'OK' }]
+        );
       }
-    } catch (galleryErr) {
-      console.warn('[RecoveryReceipt] Could not save to gallery:', galleryErr);
+    } catch (galleryErr: any) {
+      console.warn('[RecoveryReceipt] Could not save to gallery:', galleryErr?.message || galleryErr);
     }
 
     return savedAssetUri || imageUri;
@@ -399,7 +432,8 @@ const styles = StyleSheet.create({
   // ===== RECEIPT =====
   receipt: {
     borderRadius: Radius.xl,
-    padding: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
     backgroundColor: '#1D4ED8',
     overflow: 'hidden',
     ...Shadow.lg,
@@ -409,7 +443,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 80,
+    height: 30,
     backgroundColor: 'rgba(5,150,105,0.5)',
     borderRadius: Radius.xl,
   },
@@ -417,7 +451,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginBottom: 6,
+    marginBottom: 3,
     zIndex: 1,
   },
   receiptLogoWrap: {
@@ -449,7 +483,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
-    marginBottom: 4,
+    marginBottom: 2,
     zIndex: 1,
   },
   receiptDividerLine: {
@@ -468,7 +502,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginBottom: 2,
+    marginBottom: 1,
     zIndex: 1,
   },
   receiptShopLabel: {
@@ -481,13 +515,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: FontWeight.bold,
     color: '#FFFFFF',
-    textAlign: 'right',
+    textAlign: 'left',
   },
   receiptDateRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 6,
+    marginBottom: 3,
     zIndex: 1,
   },
   receiptDate: {
@@ -498,8 +532,8 @@ const styles = StyleSheet.create({
   receiptAmounts: {
     backgroundColor: 'rgba(0,0,0,0.2)',
     borderRadius: Radius.lg,
-    padding: 10,
-    marginBottom: 6,
+    padding: 8,
+    marginBottom: 3,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',
     zIndex: 1,
@@ -537,7 +571,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    marginBottom: 6,
+    marginBottom: 3,
     zIndex: 1,
   },
   receiptThankText: {

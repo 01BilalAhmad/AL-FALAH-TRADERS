@@ -14,7 +14,7 @@ interface SuccessOverlayProps {
   onUndo?: () => void;
 }
 
-const UNDO_WINDOW_MS = 5000;
+const UNDO_WINDOW_MS = 4000;
 
 export function SuccessOverlay({ visible, shopName, amount, isOffline, onDismiss, onUndo }: SuccessOverlayProps) {
   const scale = useRef(new Animated.Value(0.5)).current;
@@ -46,10 +46,10 @@ export function SuccessOverlay({ visible, shopName, amount, isOffline, onDismiss
         }, UNDO_WINDOW_MS);
       }
 
-      // Auto-dismiss overlay after 3.5s (give undo 5s window, but overlay fades a bit later)
+      // Auto-dismiss overlay after 2.5s so SMS popup can appear quickly
       dismissTimerRef.current = setTimeout(() => {
         Animated.timing(opacity, { toValue: 0, duration: 300, useNativeDriver: true }).start(onDismiss);
-      }, 5500);
+      }, 2500);
 
       return () => {
         if (undoTimerRef.current) clearTimeout(undoTimerRef.current);

@@ -14,6 +14,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { captureRef } from '@/utils/captureRef';
 import * as Sharing from 'expo-sharing';
 import * as Linking from 'expo-linking';
+import * as MediaLibrary from 'expo-media-library';
 import { Colors, Spacing, Radius, FontSize, FontWeight, Shadow } from '@/constants/theme';
 import { sendRecoverySms } from '@/utils/sendRecoverySms';
 import { sendRecoveryWhatsapp } from '@/utils/sendRecoveryWhatsapp';
@@ -110,7 +111,7 @@ export function NotificationChoice({ visible, payload, onDone }: NotificationCho
       // Build text message for shopkeeper
       const textMessage = buildRecoveryText(payload);
 
-      // First try to capture receipt as image and share via WhatsApp
+      // First try to capture receipt as image, save to gallery, and share via WhatsApp
       if (receiptRef.current) {
         try {
           await new Promise(r => setTimeout(r, 300));
@@ -122,6 +123,32 @@ export function NotificationChoice({ visible, payload, onDone }: NotificationCho
 
           if (imageUri) {
             console.log('[NotificationChoice] Receipt image captured:', imageUri);
+
+            // Save to Gallery first
+            try {
+              const { status } = await MediaLibrary.requestPermissionsAsync(true);
+              if (status === 'granted') {
+                // Ensure URI has file:// prefix
+                const normalizedImgUri = imageUri.startsWith('file://') ? imageUri : `file://${imageUri}`;
+                const asset = await MediaLibrary.createAssetAsync(normalizedImgUri);
+                try {
+                  await MediaLibrary.createAlbumAsync('AlFalah Receipts', asset, false);
+                } catch {
+                  try {
+                    const album = await MediaLibrary.getAlbumAsync('AlFalah Receipts');
+                    if (album) {
+                      await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+                    }
+                  } catch {}
+                }
+                console.log('[NotificationChoice] Receipt saved to gallery:', asset.uri);
+              } else {
+                console.warn('[NotificationChoice] MediaLibrary permission denied for gallery save');
+              }
+            } catch (galleryErr) {
+              console.warn('[NotificationChoice] Could not save to gallery:', galleryErr);
+            }
+
             // Share image via native share sheet
             const isAvailable = await Sharing.isAvailableAsync();
             if (isAvailable) {
@@ -406,7 +433,8 @@ const styles = StyleSheet.create({
   receiptCard: {
     width: 340,
     borderRadius: Radius.xl,
-    padding: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 6,
     backgroundColor: '#1D4ED8',
     overflow: 'hidden',
   },
@@ -415,7 +443,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 100,
+    height: 30,
     backgroundColor: 'rgba(5,150,105,0.5)',
     borderRadius: Radius.xl,
   },
@@ -423,7 +451,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginBottom: 12,
+    marginBottom: 4,
     zIndex: 1,
   },
   receiptLogoBox: {
@@ -447,14 +475,14 @@ const styles = StyleSheet.create({
   receiptDivider: {
     height: 1,
     backgroundColor: 'rgba(255,255,255,0.12)',
-    marginBottom: 12,
+    marginBottom: 4,
     zIndex: 1,
   },
   receiptInfoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 4,
+    marginBottom: 2,
     zIndex: 1,
   },
   receiptInfoLabel: {
@@ -467,14 +495,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: FontWeight.bold,
     color: '#FFFFFF',
-    textAlign: 'right',
+    textAlign: 'left',
   },
   receiptAmountBox: {
     backgroundColor: 'rgba(0,0,0,0.2)',
     borderRadius: Radius.md,
-    padding: 14,
-    marginTop: 8,
-    marginBottom: 10,
+    padding: 8,
+    marginTop: 2,
+    marginBottom: 3,
     zIndex: 1,
   },
   receiptAmountRow: {

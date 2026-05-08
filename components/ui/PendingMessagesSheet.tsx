@@ -633,7 +633,8 @@ const styles = StyleSheet.create({
   receiptCard: {
     width: 320,
     borderRadius: Radius.xl,
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 6,
     backgroundColor: '#1D4ED8',
     overflow: 'hidden',
   },
@@ -642,7 +643,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 80,
+    height: 30,
     backgroundColor: 'rgba(5,150,105,0.5)',
     borderRadius: Radius.xl,
   },
@@ -650,7 +651,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 10,
+    marginBottom: 4,
     zIndex: 1,
   },
   receiptLogo: {
@@ -673,7 +674,7 @@ const styles = StyleSheet.create({
   receiptSep: {
     height: 1,
     backgroundColor: 'rgba(255,255,255,0.1)',
-    marginBottom: 10,
+    marginBottom: 4,
     zIndex: 1,
   },
   receiptRow: {
@@ -695,9 +696,9 @@ const styles = StyleSheet.create({
   receiptAmountBox: {
     backgroundColor: 'rgba(0,0,0,0.2)',
     borderRadius: Radius.md,
-    padding: 12,
-    marginTop: 6,
-    marginBottom: 8,
+    padding: 8,
+    marginTop: 2,
+    marginBottom: 3,
     zIndex: 1,
   },
   receiptAmtRow: {
