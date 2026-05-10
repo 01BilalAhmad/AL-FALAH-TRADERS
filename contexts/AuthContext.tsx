@@ -29,14 +29,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function loadSession() {
     try {
-      const [savedUser, savedToken] = await Promise.all([
+      const [savedUser, savedToken, savedDistPhone] = await Promise.all([
         StorageService.getUser(),
         StorageService.getToken(),
+        StorageService.getDistributorPhone(),
       ]);
       if (savedUser && savedToken) {
         setUser(savedUser);
         setToken(savedToken);
-        // Fetch distributor phone on session load
+        // Use saved distributor phone first (works offline)
+        if (savedDistPhone) {
+          setDistributorPhone(savedDistPhone);
+        }
+        // Then try to refresh from API (will fail silently if offline)
         fetchDistPhone(savedUser.companyId);
       }
     } catch (e) {
@@ -82,6 +87,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await ApiService.fetchDistributorPhone(companyId);
       const phone = res.distributorPhone || null;
       setDistributorPhone(phone);
+      // Save locally for offline use
+      if (phone) {
+        await StorageService.saveDistributorPhone(phone);
+      }
       return phone;
     } catch (e) {
       console.error('Failed to fetch distributor phone:', e);

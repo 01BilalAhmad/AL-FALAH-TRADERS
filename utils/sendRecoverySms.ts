@@ -11,6 +11,7 @@ interface SmsPayload {
   openingBalance: number;
   recoveryAmount: number;
   remainingBalance: number;
+  distributorPhone?: string;
 }
 
 // Try to load native direct SMS module (Android only)
@@ -46,26 +47,30 @@ function formatPhoneNumberInternational(raw: string): string {
   return '+92' + phone;
 }
 
-function buildMessage(shopName: string, openingBalance: number, recoveryAmount: number, remainingBalance: number): string {
+function buildMessage(shopName: string, openingBalance: number, recoveryAmount: number, remainingBalance: number, distributorPhone?: string): string {
   const today = new Date().toLocaleDateString('en-PK', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
   });
 
-  return `Al FALAH Credit System - Recovery Update\n\n`
+  let msg = `Al FALAH Credit System - Recovery Update\n\n`
     + `Dear ${shopName},\n\n`
     + `Your account has been updated:\n\n`
     + `Opening Balance: ${formatPKR(openingBalance)}\n`
     + `Recovery Received: ${formatPKR(recoveryAmount)}\n`
     + `Remaining Balance: ${formatPKR(remainingBalance)}\n\n`
-    + `Date: ${today}\n\n`
-    + `Thank you for your payment!\n`
+    + `Date: ${today}\n`;
+  if (distributorPhone) {
+    msg += `\nDistributor No: ${distributorPhone}\n`;
+  }
+  msg += `\nThank you for your payment!\n`
     + `Al FALAH Credit System`;
+  return msg;
 }
 
 export async function sendRecoverySms(payload: SmsPayload): Promise<boolean> {
-  const { shopPhone, shopName, openingBalance, recoveryAmount, remainingBalance } = payload;
+  const { shopPhone, shopName, openingBalance, recoveryAmount, remainingBalance, distributorPhone } = payload;
 
   if (!shopPhone || shopPhone.trim().length === 0) {
     console.log('[SMS] No phone number provided, skipping SMS');
@@ -74,7 +79,7 @@ export async function sendRecoverySms(payload: SmsPayload): Promise<boolean> {
 
   const localPhone = formatPhoneNumber(shopPhone); // 03XX format for SmsManager
   const intlPhone = formatPhoneNumberInternational(shopPhone); // +923XX format for expo-sms
-  const message = buildMessage(shopName, openingBalance, recoveryAmount, remainingBalance);
+  const message = buildMessage(shopName, openingBalance, recoveryAmount, remainingBalance, distributorPhone);
 
   try {
     // === METHOD 1: Native Direct SMS (Android - silent, no UI) ===

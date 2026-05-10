@@ -117,15 +117,19 @@ export function NotificationChoice({ visible, payload, onDone }: NotificationCho
 
   /** Build recovery text message */
   const buildRecoveryText = (p: NotificationPayload): string => {
-    return `Al FALAH Credit System - Recovery Update\n\n`
+    let msg = `Al FALAH Credit System - Recovery Update\n\n`
       + `Dear ${p.shopName},\n\n`
       + `Your account has been updated:\n\n`
       + `Opening Balance: ${formatPKR(p.openingBalance)}\n`
       + `Recovery Received: ${formatPKR(p.recoveryAmount)}\n`
       + `Remaining Balance: ${formatPKR(p.remainingBalance)}\n\n`
-      + `Date: ${today}\n\n`
-      + `Thank you for your payment!\n`
+      + `Date: ${today}\n`;
+    if (p.distributorPhone) {
+      msg += `\nDistributor No: ${p.distributorPhone}\n`;
+    }
+    msg += `\nThank you for your payment!\n`
       + `Al FALAH Credit System`;
+    return msg;
   };
 
   /** Open WhatsApp chat directly to shop's number with pre-filled text */

@@ -120,15 +120,19 @@ export function PendingMessagesSheet({
       month: 'short',
       year: 'numeric',
     });
-    return `Al FALAH Credit System - Recovery Update\n\n`
+    let msg = `Al FALAH Credit System - Recovery Update\n\n`
       + `Dear ${item.shopName},\n\n`
       + `Your account has been updated:\n\n`
       + `Opening Balance: ${formatPKR(item.openingBalance)}\n`
       + `Recovery Received: ${formatPKR(item.recoveryAmount)}\n`
       + `Remaining Balance: ${formatPKR(item.remainingBalance)}\n\n`
-      + `Date: ${today}\n\n`
-      + `Thank you for your payment!\n`
+      + `Date: ${today}\n`;
+    if (item.distributorPhone) {
+      msg += `\nDistributor No: ${item.distributorPhone}\n`;
+    }
+    msg += `\nThank you for your payment!\n`
       + `Al FALAH Credit System`;
+    return msg;
   };
 
   /** Open WhatsApp directly to shop's number with pre-filled text */
@@ -167,6 +171,7 @@ export function PendingMessagesSheet({
         openingBalance: item.openingBalance,
         recoveryAmount: item.recoveryAmount,
         remainingBalance: item.remainingBalance,
+        distributorPhone: item.distributorPhone,
       });
       if (sent) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

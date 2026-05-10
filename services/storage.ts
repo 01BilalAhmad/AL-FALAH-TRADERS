@@ -21,6 +21,7 @@ const KEYS = {
   VISITED_SHOPS: 'af_visited_shops',
   RECOVERY_SUBMITTED_SHOPS: 'af_recovery_submitted_shops',
   OFFLINE_PHONE_UPDATES: 'af_offline_phone_updates',
+  DISTRIBUTOR_PHONE: 'af_distributor_phone', // saved locally for offline receipt use
 };
 
 export interface PendingNotification {
@@ -569,6 +570,15 @@ export const StorageService = {
 
   clearOfflinePhoneUpdates: async () => {
     await AsyncStorage.setItem(KEYS.OFFLINE_PHONE_UPDATES, JSON.stringify([]));
+  },
+
+  // --- Distributor Phone (persisted locally for offline receipt) ---
+  saveDistributorPhone: async (phone: string) => {
+    await AsyncStorage.setItem(KEYS.DISTRIBUTOR_PHONE, phone);
+  },
+
+  getDistributorPhone: async (): Promise<string | null> => {
+    return AsyncStorage.getItem(KEYS.DISTRIBUTOR_PHONE);
   },
 
   // --- Update phone in local shops cache (AsyncStorage) ---
