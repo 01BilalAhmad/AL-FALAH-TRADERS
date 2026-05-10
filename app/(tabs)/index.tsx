@@ -1,5 +1,5 @@
 // Al FALAH Credit System
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   TextInput,
   Pressable,
   Linking,
+  AppState,
+  AppStateStatus,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -170,6 +172,40 @@ export default function TodayRouteScreen() {
       loadPendingNotifications();
     }
   }, [user, allRoutesEnabled]);
+
+  // ── Pending Reminder: Show alert when app comes to foreground with pending receipts ──
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+      if (nextState === 'active') {
+        // Check for pending notifications when app comes to foreground
+        loadPendingNotifications();
+      }
+    });
+    return () => subscription.remove();
+  }, []);
+
+  // ── Pending Reminder: Show alert on app open if there are pending receipts ──
+  const pendingAlertShownRef = useRef(false);
+  useEffect(() => {
+    if (pendingNotifications.length > 0 && user && !pendingAlertShownRef.current) {
+      pendingAlertShownRef.current = true;
+      // Small delay to not interfere with initial load
+      const timer = setTimeout(() => {
+        Alert.alert(
+          'Pending Receipts',
+          `${pendingNotifications.length} receipt${pendingNotifications.length > 1 ? 's' : ''} pending hain — SMS/WhatsApp bhejna lazmi hai!`,
+          [
+            { text: 'Abhi Bhej', onPress: () => setShowPending(true) },
+            { text: 'Baad Mein', style: 'cancel' },
+          ]
+        );
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+    if (pendingNotifications.length === 0) {
+      pendingAlertShownRef.current = false;
+    }
+  }, [pendingNotifications.length, user]);
 
   async function loadPendingNotifications() {
     try {
@@ -1326,6 +1362,14 @@ export default function TodayRouteScreen() {
         } : null}
         onDone={(method: NotificationMethod) => {
           setNotifChoice((s) => ({ ...s, visible: false }));
+
+          // If user denied sending (clicked "Nahi, Abhi Bhejna Hai"), keep in pending
+          if (method === ('_keep_pending' as NotificationMethod)) {
+            // Don't remove from pending, don't increment count
+            // Receipt stays in pending list for later
+            return;
+          }
+
           // Increment count (unique per shop via StorageService)
           StorageService.incrementNotifCount(method, notifChoice.shopId || undefined).then((counts) => {
             setSmsSentCount(counts.sms);

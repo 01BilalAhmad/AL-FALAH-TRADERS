@@ -1,5 +1,6 @@
 // Powered by OnSpace.AI
-import React, { useEffect, useRef, useState } from 'react';
+// Strict SMS System: WhatsApp opens directly to shop number, confirmation required after return
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,17 +10,16 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  AppState,
+  AppStateStatus,
+  Linking,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { captureRef } from '@/utils/captureRef';
-import * as Sharing from 'expo-sharing';
-import * as Linking from 'expo-linking';
 import * as MediaLibrary from 'expo-media-library';
 import { Colors, Spacing, Radius, FontSize, FontWeight, Shadow } from '@/constants/theme';
 import { sendRecoverySms } from '@/utils/sendRecoverySms';
-import { sendRecoveryWhatsapp } from '@/utils/sendRecoveryWhatsapp';
 import { formatPKR } from '@/utils/format';
-import { Platform } from 'react-native';
 
 interface NotificationPayload {
   shopPhone: string;
@@ -42,17 +42,32 @@ interface NotificationChoiceProps {
   onDone: (method: NotificationMethod) => void;
 }
 
+/** Format phone to international format for WhatsApp (923001234567) */
+function formatPhoneIntl(phone: string): string {
+  let p = phone.trim().replace(/[^0-9]/g, '');
+  if (p.startsWith('0')) p = p.substring(1);
+  if (!p.startsWith('92')) p = '92' + p;
+  return p.replace(/[^0-9]/g, '');
+}
+
 export function NotificationChoice({ visible, payload, onDone }: NotificationChoiceProps) {
   const [sending, setSending] = useState(false);
   const [smsStatus, setSmsStatus] = useState<'idle' | 'success' | 'failed'>('idle');
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [confirmWarning, setConfirmWarning] = useState(false);
   const scale = useRef(new Animated.Value(0.8)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const receiptRef = useRef<View>(null);
+  const whatsappOpenedAt = useRef<number | null>(null);
+  const appStateRef = useRef(AppState.currentState);
+  const waitingForReturn = useRef(false);
 
   useEffect(() => {
     if (visible) {
       setSending(false);
       setSmsStatus('idle');
+      setShowConfirm(false);
+      setConfirmWarning(false);
       Animated.parallel([
         Animated.spring(scale, { toValue: 1, useNativeDriver: true, tension: 80, friction: 10 }),
         Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }),
@@ -60,14 +75,127 @@ export function NotificationChoice({ visible, payload, onDone }: NotificationCho
     } else {
       scale.setValue(0.8);
       opacity.setValue(0);
+      setShowConfirm(false);
+      setConfirmWarning(false);
+      waitingForReturn.current = false;
+      whatsappOpenedAt.current = null;
     }
   }, [visible]);
+
+  // Listen for app returning from WhatsApp
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+      if (
+        appStateRef.current.match(/inactive|background/) &&
+        nextState === 'active' &&
+        waitingForReturn.current
+      ) {
+        // User returned from WhatsApp
+        waitingForReturn.current = false;
+        const timeSpent = whatsappOpenedAt.current ? Date.now() - whatsappOpenedAt.current : 0;
+        whatsappOpenedAt.current = null;
+
+        console.log('[NotificationChoice] Returned from WhatsApp, time spent:', timeSpent, 'ms');
+
+        // Time detection: if < 3 seconds, likely didn't send
+        const tooFast = timeSpent < 3000;
+        setConfirmWarning(tooFast);
+        setShowConfirm(true);
+        setSending(false);
+      }
+      appStateRef.current = nextState;
+    });
+
+    return () => subscription.remove();
+  }, []);
 
   const today = new Date().toLocaleDateString('en-PK', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
   });
+
+  /** Build recovery text message */
+  const buildRecoveryText = (p: NotificationPayload): string => {
+    return `Al FALAH Credit System - Recovery Update\n\n`
+      + `Dear ${p.shopName},\n\n`
+      + `Your account has been updated:\n\n`
+      + `Opening Balance: ${formatPKR(p.openingBalance)}\n`
+      + `Recovery Received: ${formatPKR(p.recoveryAmount)}\n`
+      + `Remaining Balance: ${formatPKR(p.remainingBalance)}\n\n`
+      + `Date: ${today}\n\n`
+      + `Thank you for your payment!\n`
+      + `Al FALAH Credit System`;
+  };
+
+  /** Open WhatsApp chat directly to shop's number with pre-filled text */
+  const openWhatsAppDirect = async (phone: string, message: string): Promise<boolean> => {
+    if (!phone || phone.trim().length === 0) return false;
+
+    const formattedPhone = formatPhoneIntl(phone);
+    const encodedMessage = encodeURIComponent(message);
+    const url = `https://wa.me/${formattedPhone}?text=${encodedMessage}`;
+
+    try {
+      const canOpen = await Linking.canOpenURL(url);
+      if (canOpen) {
+        await Linking.openURL(url);
+        return true;
+      } else {
+        Alert.alert(
+          'WhatsApp Not Available',
+          'WhatsApp is not installed on this device. Please install WhatsApp or use SMS.',
+        );
+        return false;
+      }
+    } catch (e) {
+      console.warn('[NotificationChoice] Could not open WhatsApp:', e);
+      Alert.alert('Error', 'Could not open WhatsApp. Please try again.');
+      return false;
+    }
+  };
+
+  /** Save receipt image to gallery */
+  const saveReceiptToGallery = async (): Promise<string | null> => {
+    if (!receiptRef.current) return null;
+
+    try {
+      await new Promise(r => setTimeout(r, 300));
+      const imageUri = await captureRef(receiptRef, {
+        format: 'png',
+        quality: 1.0,
+        result: 'tmpfile',
+      });
+
+      if (imageUri) {
+        console.log('[NotificationChoice] Receipt image captured:', imageUri);
+        try {
+          const { status } = await MediaLibrary.requestPermissionsAsync(true);
+          if (status === 'granted') {
+            const normalizedImgUri = imageUri.startsWith('file://') ? imageUri : `file://${imageUri}`;
+            const asset = await MediaLibrary.createAssetAsync(normalizedImgUri);
+            try {
+              await MediaLibrary.createAlbumAsync('AlFalah Receipts', asset, false);
+            } catch {
+              try {
+                const album = await MediaLibrary.getAlbumAsync('AlFalah Receipts');
+                if (album) {
+                  await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+                }
+              } catch {}
+            }
+            console.log('[NotificationChoice] Receipt saved to gallery:', asset.uri);
+          }
+        } catch (galleryErr) {
+          console.warn('[NotificationChoice] Could not save to gallery:', galleryErr);
+        }
+        return imageUri;
+      }
+    } catch (captureErr) {
+      console.warn('[NotificationChoice] Image capture failed:', captureErr);
+    }
+    return null;
+  };
 
   const handleSms = async () => {
     if (!payload) return;
@@ -85,24 +213,26 @@ export function NotificationChoice({ visible, payload, onDone }: NotificationCho
       } else {
         console.warn('[NotificationChoice] SMS failed to send');
         setSmsStatus('failed');
+        // DON'T call onDone — keep in pending
         Alert.alert(
-          'SMS Failed',
-          'Could not send SMS directly. Please try WhatsApp or send manually from your messaging app.',
+          'SMS Bhejne Mein Masla',
+          'SMS bhej nahi saka. WhatsApp try karein ya dobara koshish karein.\n\nYe receipt Pending mein rahegi jab tak message send nahi hota.',
           [
-            { text: 'Try WhatsApp', onPress: () => { setSmsStatus('idle'); } },
-            { text: 'OK', onPress: () => { setSmsStatus('idle'); onDone('sms'); } },
+            { text: 'WhatsApp Try Karo', onPress: () => { setSmsStatus('idle'); setSending(false); } },
+            { text: 'Baad Mein Bhejunga', onPress: () => { setSmsStatus('idle'); setSending(false); } },
           ]
         );
       }
     } catch (err) {
       console.error('[NotificationChoice] SMS error:', err);
       setSmsStatus('failed');
+      // DON'T call onDone — keep in pending
       Alert.alert(
         'SMS Error',
-        'An error occurred while sending SMS. Please try WhatsApp or send manually.',
+        'SMS bhejne mein error aaya. WhatsApp try karein.\n\nYe receipt Pending mein rahegi.',
         [
-          { text: 'Try WhatsApp', onPress: () => { setSmsStatus('idle'); } },
-          { text: 'OK', onPress: () => { setSmsStatus('idle'); onDone('sms'); } },
+          { text: 'WhatsApp Try Karo', onPress: () => { setSmsStatus('idle'); setSending(false); } },
+          { text: 'Baad Mein Bhejunga', onPress: () => { setSmsStatus('idle'); setSending(false); } },
         ]
       );
     }
@@ -112,124 +242,49 @@ export function NotificationChoice({ visible, payload, onDone }: NotificationCho
   const handleWhatsapp = async () => {
     if (!payload) return;
     setSending(true);
+
     try {
-      // Build text message for shopkeeper
+      // Step 1: Save receipt image to gallery (so OB can attach it in WhatsApp)
+      await saveReceiptToGallery();
+
+      // Step 2: Build text message
       const textMessage = buildRecoveryText(payload);
 
-      // First try to capture receipt as image, save to gallery, and share via WhatsApp
-      if (receiptRef.current) {
-        try {
-          await new Promise(r => setTimeout(r, 300));
-          const imageUri = await captureRef(receiptRef, {
-            format: 'png',
-            quality: 1.0,
-            result: 'tmpfile',
-          });
+      // Step 3: Open WhatsApp directly to shop's number with pre-filled text
+      const opened = await openWhatsAppDirect(payload.shopPhone, textMessage);
 
-          if (imageUri) {
-            console.log('[NotificationChoice] Receipt image captured:', imageUri);
-
-            // Save to Gallery first
-            try {
-              const { status } = await MediaLibrary.requestPermissionsAsync(true);
-              if (status === 'granted') {
-                // Ensure URI has file:// prefix
-                const normalizedImgUri = imageUri.startsWith('file://') ? imageUri : `file://${imageUri}`;
-                const asset = await MediaLibrary.createAssetAsync(normalizedImgUri);
-                try {
-                  await MediaLibrary.createAlbumAsync('AlFalah Receipts', asset, false);
-                } catch {
-                  try {
-                    const album = await MediaLibrary.getAlbumAsync('AlFalah Receipts');
-                    if (album) {
-                      await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
-                    }
-                  } catch {}
-                }
-                console.log('[NotificationChoice] Receipt saved to gallery:', asset.uri);
-              } else {
-                console.warn('[NotificationChoice] MediaLibrary permission denied for gallery save');
-              }
-            } catch (galleryErr) {
-              console.warn('[NotificationChoice] Could not save to gallery:', galleryErr);
-            }
-
-            // Share image via native share sheet
-            const isAvailable = await Sharing.isAvailableAsync();
-            if (isAvailable) {
-              await Sharing.shareAsync(imageUri, {
-                mimeType: 'image/png',
-                dialogTitle: `Share Receipt to ${payload.shopName}`,
-                UTI: 'public.png',
-              });
-
-              // After sharing image, also send text message to shopkeeper on WhatsApp
-              // This ensures the shopkeeper receives BOTH image AND text
-              try {
-                await openWhatsAppWithText(payload.shopPhone, textMessage);
-              } catch (textErr) {
-                console.warn('[NotificationChoice] Could not send text after image share:', textErr);
-              }
-
-              onDone('whatsapp');
-              setSending(false);
-              return;
-            }
-          }
-        } catch (captureErr) {
-          console.warn('[NotificationChoice] Image capture failed, falling back to text:', captureErr);
-        }
+      if (opened) {
+        // Record when WhatsApp was opened for time detection
+        whatsappOpenedAt.current = Date.now();
+        waitingForReturn.current = true;
+        // Don't call onDone yet — wait for user to return from WhatsApp
+        // AppState listener will handle the confirmation dialog
+        console.log('[NotificationChoice] WhatsApp opened, waiting for return...');
+      } else {
+        // WhatsApp couldn't open — keep in pending
+        setSending(false);
       }
-
-      // Fallback: Send text message via WhatsApp deep link (with image failed)
-      await sendRecoveryWhatsapp(payload);
     } catch (err) {
       console.error('[NotificationChoice] WhatsApp error:', err);
+      setSending(false);
     }
-    setSending(false);
+  };
+
+  /** User confirmed they sent the WhatsApp message */
+  const handleConfirmSent = useCallback(() => {
+    console.log('[NotificationChoice] User confirmed WhatsApp sent');
+    setShowConfirm(false);
     onDone('whatsapp');
-  };
+  }, [onDone]);
 
-  /** Build recovery text message */
-  const buildRecoveryText = (p: NotificationPayload): string => {
-    return `Al FALAH Credit System - Recovery Update\n\n`
-      + `Dear ${p.shopName},\n\n`
-      + `Your account has been updated:\n\n`
-      + `Opening Balance: ${formatPKR(p.openingBalance)}\n`
-      + `Recovery Received: ${formatPKR(p.recoveryAmount)}\n`
-      + `Remaining Balance: ${formatPKR(p.remainingBalance)}\n\n`
-      + `Date: ${today}\n\n`
-      + `Thank you for your payment!\n`
-      + `Al FALAH Credit System`;
-  };
-
-  /** Open WhatsApp chat with text message to a phone number */
-  const openWhatsAppWithText = async (phone: string, message: string): Promise<boolean> => {
-    if (!phone || phone.trim().length === 0) return false;
-
-    let formattedPhone = phone.trim().replace(/[^0-9]/g, '');
-    if (formattedPhone.startsWith('0')) {
-      formattedPhone = formattedPhone.substring(1);
-    }
-    if (!formattedPhone.startsWith('92')) {
-      formattedPhone = '92' + formattedPhone;
-    }
-    formattedPhone = formattedPhone.replace(/[^0-9]/g, '');
-
-    const encodedMessage = encodeURIComponent(message);
-    const url = `https://wa.me/${formattedPhone}?text=${encodedMessage}`;
-
-    try {
-      const canOpen = await Linking.canOpenURL(url);
-      if (canOpen) {
-        await Linking.openURL(url);
-        return true;
-      }
-    } catch (e) {
-      console.warn('[NotificationChoice] Could not open WhatsApp with text:', e);
-    }
-    return false;
-  };
+  /** User denied sending — keep in pending */
+  const handleDenySent = useCallback(() => {
+    console.log('[NotificationChoice] User denied sending — keeping in pending');
+    setShowConfirm(false);
+    setSending(false);
+    // Close the modal but DON'T call onDone — receipt stays in pending
+    onDone('_keep_pending' as NotificationMethod);
+  }, [onDone]);
 
   if (!payload) return null;
 
@@ -416,8 +471,64 @@ export function NotificationChoice({ visible, payload, onDone }: NotificationCho
               )}
             </View>
           </Pressable>
+
+          {/* Gallery hint */}
+          <View style={styles.galleryHint}>
+            <MaterialIcons name="photo-library" size={14} color={Colors.textSecondary} />
+            <Text style={styles.galleryHintText}>
+              Receipt image gallery mein save ho gayi hai — WhatsApp mein attach karein
+            </Text>
+          </View>
         </Animated.View>
       </View>
+
+      {/* ── WhatsApp Confirmation Dialog ── */}
+      <Modal visible={showConfirm} transparent animationType="fade">
+        <View style={styles.confirmOverlay}>
+          <View style={styles.confirmCard}>
+            {/* Warning icon */}
+            <View style={[styles.confirmIconWrap, confirmWarning && styles.confirmIconWrapWarning]}>
+              <MaterialIcons
+                name={confirmWarning ? 'warning' : 'help-outline'}
+                size={36}
+                color="#FFFFFF"
+              />
+            </View>
+
+            <Text style={styles.confirmTitle}>
+              {confirmWarning ? 'Lagta Hai Message Nahi Bheja!' : 'Kya Message Bhej Diya?'}
+            </Text>
+
+            <Text style={styles.confirmSubtitle}>
+              {confirmWarning
+                ? 'Aap bohot jaldi wapas aaye. Kya aapne WhatsApp pe message bhej diya? Agar nahi bheja toh ye receipt Pending mein rahegi.'
+                : 'Kya aapne WhatsApp pe message bhej diya? Agar nahi bheja toh ye receipt Pending mein rahegi.'
+              }
+            </Text>
+
+            {/* Confirm buttons */}
+            <Pressable
+              style={({ pressed }) => [styles.confirmBtnYes, pressed && styles.btnPressed]}
+              onPress={handleConfirmSent}
+            >
+              <View style={styles.confirmBtnYesGradient}>
+                <MaterialIcons name="check-circle" size={20} color="#FFFFFF" />
+                <Text style={styles.confirmBtnYesText}>Haan, Bhej Diya</Text>
+              </View>
+            </Pressable>
+
+            <Pressable
+              style={({ pressed }) => [styles.confirmBtnNo, pressed && styles.btnPressed]}
+              onPress={handleDenySent}
+            >
+              <View style={styles.confirmBtnNoGradient}>
+                <MaterialIcons name="cancel" size={20} color="#FFFFFF" />
+                <Text style={styles.confirmBtnNoText}>Nahi, Abhi Bhejna Hai</Text>
+              </View>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </Modal>
   );
 }
@@ -475,6 +586,21 @@ const styles = StyleSheet.create({
   shopHighlight: {
     fontWeight: FontWeight.bold,
     color: Colors.primary,
+  },
+
+  // Gallery hint
+  galleryHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: Spacing.sm,
+    paddingHorizontal: Spacing.xs,
+  },
+  galleryHintText: {
+    flex: 1,
+    fontSize: FontSize.xs,
+    color: Colors.textSecondary,
+    lineHeight: 16,
   },
 
   // Hidden receipt for image capture
@@ -745,5 +871,89 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     color: 'rgba(255,255,255,0.8)',
     marginTop: 1,
+  },
+
+  // ── Confirmation Dialog Styles ──
+  confirmOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.xl,
+  },
+  confirmCard: {
+    backgroundColor: Colors.background,
+    borderRadius: Radius.xxl,
+    padding: Spacing.xl,
+    width: '100%',
+    maxWidth: 360,
+    alignItems: 'center',
+    ...Shadow.xl,
+  },
+  confirmIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.md,
+    ...Shadow.md,
+  },
+  confirmIconWrapWarning: {
+    backgroundColor: '#F59E0B',
+  },
+  confirmTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: FontWeight.bold,
+    color: Colors.text,
+    textAlign: 'center',
+    marginBottom: Spacing.sm,
+  },
+  confirmSubtitle: {
+    fontSize: FontSize.sm,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: Spacing.lg,
+  },
+  confirmBtnYes: {
+    borderRadius: Radius.md,
+    width: '100%',
+    marginBottom: Spacing.sm,
+    overflow: 'hidden',
+  },
+  confirmBtnYesGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    paddingHorizontal: Spacing.md,
+    backgroundColor: '#25D366',
+  },
+  confirmBtnYesText: {
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.bold,
+    color: '#FFFFFF',
+  },
+  confirmBtnNo: {
+    borderRadius: Radius.md,
+    width: '100%',
+    overflow: 'hidden',
+  },
+  confirmBtnNoGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    paddingHorizontal: Spacing.md,
+    backgroundColor: Colors.danger,
+  },
+  confirmBtnNoText: {
+    fontSize: FontSize.base,
+    fontWeight: FontWeight.bold,
+    color: '#FFFFFF',
   },
 });
