@@ -386,6 +386,71 @@ export default function TodayRouteScreen() {
         // Feature 13: Update last recovery date
         StorageService.updateLastRecoveryDate(shopId, new Date().toISOString());
         setSuccessState({ visible: true, shopName, amount: payload.amount, isOffline: true });
+
+        // OFFLINE: Also create pending notification and show receipt/notification choice
+        // Even when offline, user can add phone number and send receipt later
+        const remainingBalance = openingBalance - payload.amount;
+        if (shopPhone) {
+          // Shop has phone — create pending notification and show NotificationChoice
+          const pendingNotif: PendingNotification = {
+            id: `${shopId}_${Date.now()}`,
+            shopId,
+            shopName,
+            shopPhone,
+            area: recoveryShop.area,
+            openingBalance,
+            recoveryAmount: payload.amount,
+            remainingBalance,
+            companyName: user.companyName || undefined,
+            orderbookerName: user.name || undefined,
+            distributorPhone: distributorPhone || undefined,
+            createdAt: new Date().toISOString(),
+            date: getTodayDateStr(),
+          };
+          await StorageService.addPendingNotification(pendingNotif);
+          loadPendingNotifications();
+
+          // Store pending notification data for after SuccessOverlay dismisses
+          setPendingNotifAfterSuccess({
+            shopId,
+            shopPhone,
+            shopName,
+            shopAddress: recoveryShop.address || recoveryShop.area || undefined,
+            shopOwnerName: recoveryShop.ownerName || undefined,
+            openingBalance,
+            recoveryAmount: payload.amount,
+            remainingBalance,
+            companyName: user.companyName || undefined,
+            orderbookerName: user.name || undefined,
+            distributorPhone: distributorPhone || undefined,
+          });
+
+          // Fallback timeout in case SuccessOverlay doesn't dismiss properly
+          setTimeout(() => {
+            setNotifChoice((prev) => {
+              if (prev.visible) return prev;
+              return {
+                visible: true,
+                shopId: shopId,
+                shopPhone,
+                shopName,
+                shopAddress: recoveryShop.address || recoveryShop.area || undefined,
+                shopOwnerName: recoveryShop.ownerName || undefined,
+                openingBalance,
+                recoveryAmount: payload.amount,
+                remainingBalance,
+                companyName: user.companyName || undefined,
+                orderbookerName: user.name || undefined,
+                distributorPhone: distributorPhone || undefined,
+              };
+            });
+            setPendingNotifAfterSuccess(null);
+          }, 4000);
+        } else {
+          // No phone number — show phone input popup even in offline mode
+          // Phone will be saved when online, receipt will be sent after
+          setPhoneInputShop(recoveryShop);
+        }
       }
       setRecoveryShop(null);
     } catch (e: any) {
@@ -410,6 +475,34 @@ export default function TodayRouteScreen() {
         });
       } catch (e) {
         console.warn('Failed to record GPS visit on server:', e);
+      }
+
+      // GPS UPDATE FIX: Check if this shop has a recovery submitted today without GPS
+      // If so, update that transaction's GPS coordinates
+      try {
+        const today = getTodayDateStr();
+        const txnResult = await ApiService.getTransactions({
+          shopId,
+          createdBy: user.id,
+          type: 'recovery',
+          date: today,
+          limit: 10,
+        });
+        // Find a transaction without GPS
+        const txnWithoutGps = txnResult.transactions.find(
+          (t) => !t.gpsLat && !t.gpsLng
+        );
+        if (txnWithoutGps) {
+          console.log('[GPS Update] Found transaction without GPS:', txnWithoutGps.id, '— updating...');
+          await ApiService.updateTransactionGps(txnWithoutGps.id, {
+            gpsLat,
+            gpsLng,
+            gpsAddress: address,
+          });
+          console.log('[GPS Update] Successfully updated GPS for transaction:', txnWithoutGps.id);
+        }
+      } catch (e) {
+        console.warn('Failed to update GPS on existing transaction:', e);
       }
     }
   };

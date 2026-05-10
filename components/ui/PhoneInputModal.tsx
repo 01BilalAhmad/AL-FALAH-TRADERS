@@ -89,12 +89,22 @@ export function PhoneInputModal({ visible, shop, onPhoneSaved, onSkip }: PhoneIn
       }
 
       const trimmedOwner = ownerName.trim();
-      await ApiService.updateShopPhone(shop.id, normalized, trimmedOwner || undefined);
+
       // Update the shop object locally so it reflects immediately
       shop.phone = normalized;
       if (trimmedOwner) {
         shop.ownerName = trimmedOwner;
       }
+
+      // Try to save to server (will fail offline, but that's OK)
+      try {
+        await ApiService.updateShopPhone(shop.id, normalized, trimmedOwner || undefined);
+      } catch (apiErr: any) {
+        // API call failed (likely offline) — phone is still saved locally on the shop object
+        // The phone will be used for receipt/WhatsApp, and will sync when online
+        console.warn('[PhoneInputModal] API save failed (offline?), using local:', apiErr?.message);
+      }
+
       onPhoneSaved(normalized, trimmedOwner || undefined);
     } catch (e: any) {
       setError(e.message || 'Failed to save number. Try again.');

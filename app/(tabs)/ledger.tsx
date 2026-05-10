@@ -175,7 +175,7 @@ const txnStyles = StyleSheet.create({
 
 export default function LedgerScreen() {
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, distributorPhone } = useAuth();
   const { allShops, isLoadingAll, loadAllShops } = useShops();
 
   const [showShopPicker, setShowShopPicker] = useState(false);
@@ -207,7 +207,7 @@ export default function LedgerScreen() {
     if (!ledger) return;
     setIsGeneratingPdf(true);
     try {
-      await downloadLedgerPdf(ledger);
+      await downloadLedgerPdf(ledger, user?.companyName, distributorPhone || undefined);
     } catch (e: any) {
       Alert.alert('PDF Error', e.message || 'Failed to generate PDF. Please try again.');
     } finally {

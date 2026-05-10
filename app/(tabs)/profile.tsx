@@ -166,7 +166,7 @@ export default function ProfileScreen() {
       await updatePhone(trimmed);
       setIsEditingPhone(false);
       setPhoneInput('');
-      Alert.alert('Phone Updated', trimmed ? `Distributor number set to ${trimmed}` : 'Phone number removed');
+      Alert.alert('Phone Updated', trimmed ? `Phone number updated to ${trimmed}` : 'Phone number removed');
     } catch (err: any) {
       Alert.alert('Error', err?.message || 'Failed to update phone number');
     } finally {
@@ -256,7 +256,7 @@ export default function ProfileScreen() {
               <MaterialIcons name="call" size={18} color={Colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={infoRowStyles.label}>Phone (Distributor Number)</Text>
+              <Text style={infoRowStyles.label}>Phone Number</Text>
               {isEditingPhone ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
                   <TextInput

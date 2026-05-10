@@ -232,6 +232,12 @@ export const ApiService = {
       method: 'DELETE',
     }),
 
+  updateTransactionGps: (transactionId: string, payload: { gpsLat: number; gpsLng: number; gpsAddress?: string }) =>
+    request<{ success: boolean }>(`/api/transactions/${transactionId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+
   recordVisit: (shopId: string, payload: {
     orderbookerId: string;
     gpsLat?: number;

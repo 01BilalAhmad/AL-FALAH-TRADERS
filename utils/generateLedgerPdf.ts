@@ -6,8 +6,9 @@ import { Platform, Alert } from 'react-native';
 import { LedgerResponse } from '@/services/api';
 import { formatPKR, formatDateTime } from '@/utils/format';
 
-function generateLedgerHtml(data: LedgerResponse): string {
+function generateLedgerHtml(data: LedgerResponse, companyName?: string, distributorPhone?: string): string {
   const { shop, transactions, summary } = data;
+  const displayName = companyName || 'Al FALAH Credit System';
 
   const txnRows = transactions
     .map((t) => {
@@ -85,8 +86,9 @@ function generateLedgerHtml(data: LedgerResponse): string {
     <body>
       <div class="page">
         <div class="header">
-          <h1>Al FALAH Credit System</h1>
+          <h1>${displayName}</h1>
           <p>Customer Account Statement (Ledger)</p>
+          ${distributorPhone ? `<p style="margin-top:4px;font-size:11px;opacity:0.75;">Distributor: ${distributorPhone}</p>` : ''}
           <p style="margin-top:8px;opacity:0.7;font-size:11px;">Generated: ${generatedDate}</p>
         </div>
 
@@ -137,7 +139,8 @@ function generateLedgerHtml(data: LedgerResponse): string {
         ` : '<p style="text-align:center;color:#9CA3AF;padding:32px;">No transactions found</p>'}
 
         <div class="footer">
-          Al FALAH Credit System<br>
+          ${displayName}<br>
+          ${distributorPhone ? `Distributor: ${distributorPhone}<br>` : ''}
           This is a system-generated document.
         </div>
       </div>
@@ -146,8 +149,8 @@ function generateLedgerHtml(data: LedgerResponse): string {
   `;
 }
 
-export async function downloadLedgerPdf(data: LedgerResponse): Promise<void> {
-  const html = generateLedgerHtml(data);
+export async function downloadLedgerPdf(data: LedgerResponse, companyName?: string, distributorPhone?: string): Promise<void> {
+  const html = generateLedgerHtml(data, companyName, distributorPhone);
 
   try {
     // Step 1: Generate PDF file

@@ -194,71 +194,89 @@ export function PendingMessagesSheet({
 
   const renderItem = ({ item }: { item: PendingNotification }) => (
     <View style={styles.pendingCard}>
-      {/* Hidden Receipt for Image Capture */}
+      {/* Hidden Receipt for Image Capture - Same format as RecoveryReceipt.tsx */}
       <View style={styles.hiddenReceipt}>
         <View
           ref={(ref) => { receiptRefs.current[item.id] = ref; }}
           collapsable={false}
           style={styles.receiptCard}
         >
-          <View style={styles.receiptGradient} />
-          <View style={styles.receiptHeader}>
-            <View style={styles.receiptLogo}>
-              <MaterialIcons name="account-balance" size={18} color="#FFFFFF" />
-            </View>
-            <View>
-              <Text style={styles.receiptBrandName}>{item.companyName || 'Al FALAH Credit System'}</Text>
-              <Text style={styles.receiptBrandSub}>Payment Receipt</Text>
-            </View>
+          {/* ── 1. AL-FALAH CREDIT SYSTEM (System Header) ── */}
+          <View style={styles.receiptSystemHeader}>
+            <MaterialIcons name="account-balance" size={30} color="#FFFFFF" />
+            <Text style={styles.receiptSystemTitle}>AL-FALAH CREDIT SYSTEM</Text>
           </View>
-          {/* Distributor Phone */}
+
+          {/* ── 2. Company Name ── */}
+          <Text style={styles.receiptCompanyName}>{item.companyName || 'Al FALAH Credit System'}</Text>
+
+          {/* ── 3. Payment Receipt ── */}
+          <Text style={styles.receiptPaymentLabel}>Payment Receipt</Text>
+
+          {/* ── 4. Distributor Number ── */}
           {item.distributorPhone ? (
             <View style={styles.receiptDistPhoneRow}>
-              <MaterialIcons name="call" size={13} color="rgba(255,255,255,0.7)" />
-              <Text style={styles.receiptDistPhoneLabel}>Distributor:</Text>
+              <MaterialIcons name="call" size={16} color="#A7F3D0" />
+              <Text style={styles.receiptDistPhoneLabel}>Distributor No:</Text>
               <Text style={styles.receiptDistPhoneValue}>{item.distributorPhone}</Text>
             </View>
           ) : null}
-          <View style={styles.receiptSep} />
-          <View style={styles.receiptRow}>
-            <Text style={styles.receiptRowLabel}>Shop</Text>
-            <Text style={styles.receiptRowValue}>{item.shopName}</Text>
+
+          {/* ── Divider ── */}
+          <View style={styles.receiptDivider} />
+
+          {/* ── 5. Shop Details ── */}
+          <View style={styles.receiptShopSection}>
+            <View style={styles.receiptInfoRow}>
+              <MaterialIcons name="store" size={18} color="rgba(255,255,255,0.6)" />
+              <Text style={styles.receiptInfoLabel}>Shop:</Text>
+              <Text style={styles.receiptInfoValue}>{item.shopName}</Text>
+            </View>
+            <View style={styles.receiptInfoRow}>
+              <MaterialIcons name="calendar-today" size={18} color="rgba(255,255,255,0.6)" />
+              <Text style={styles.receiptInfoLabel}>Date:</Text>
+              <Text style={styles.receiptInfoValue}>{today}</Text>
+            </View>
           </View>
-          <View style={styles.receiptRow}>
-            <Text style={styles.receiptRowLabel}>Date</Text>
-            <Text style={styles.receiptRowValue}>{today}</Text>
-          </View>
-          {/* Orderbooker Name */}
+
+          {/* ── 6. Orderbooker Name ── */}
           {item.orderbookerName ? (
-            <View style={styles.receiptRow}>
-              <Text style={styles.receiptRowLabel}>Orderbooker</Text>
-              <Text style={styles.receiptRowValue}>{item.orderbookerName}</Text>
+            <View style={styles.receiptOrderbookerSection}>
+              <MaterialIcons name="badge" size={18} color="rgba(255,255,255,0.6)" />
+              <Text style={styles.receiptOrderbookerLabel}>Orderbooker:</Text>
+              <Text style={styles.receiptOrderbookerValue}>{item.orderbookerName}</Text>
             </View>
           ) : null}
+
+          {/* ── 7. Balance Details ── */}
           <View style={styles.receiptAmountBox}>
-            <View style={styles.receiptAmtRow}>
-              <Text style={styles.receiptAmtLabel}>Opening Balance</Text>
-              <Text style={styles.receiptAmtVal}>{formatPKR(item.openingBalance)}</Text>
+            <View style={styles.receiptAmountRow}>
+              <Text style={styles.receiptAmountLabel}>Opening Balance</Text>
+              <Text style={styles.receiptAmountValue}>{formatPKR(item.openingBalance)}</Text>
             </View>
-            <View style={styles.receiptAmtSep} />
-            <View style={styles.receiptAmtRow}>
-              <Text style={styles.receiptAmtLabel}>Recovery Received</Text>
-              <Text style={[styles.receiptAmtVal, { color: '#A7F3D0' }]}>{formatPKR(item.recoveryAmount)}</Text>
+            <View style={styles.receiptAmountSeparator} />
+            <View style={styles.receiptAmountRow}>
+              <Text style={styles.receiptAmountLabel}>Payment Received</Text>
+              <Text style={[styles.receiptAmountValue, { color: '#A7F3D0' }]}>{formatPKR(item.recoveryAmount)}</Text>
             </View>
-            <View style={styles.receiptAmtSep} />
-            <View style={[styles.receiptAmtRow, styles.receiptRemainingRow]}>
-              <Text style={[styles.receiptAmtLabel, { color: '#FFFFFF', fontWeight: FontWeight.bold }]}>Remaining Balance</Text>
-              <Text style={[styles.receiptAmtVal, { color: '#FDE68A', fontSize: 18 }]}>{formatPKR(item.remainingBalance)}</Text>
+            <View style={styles.receiptAmountSeparator} />
+            <View style={[styles.receiptAmountRow, styles.receiptRemainingRow]}>
+              <Text style={[styles.receiptAmountLabel, { fontWeight: FontWeight.bold, color: '#FFFFFF' }]}>Remaining Balance</Text>
+              <Text style={[styles.receiptAmountValue, { color: '#FDE68A', fontSize: 22 }]}>{formatPKR(item.remainingBalance)}</Text>
             </View>
           </View>
-          <View style={styles.receiptThanksRow}>
-            <MaterialIcons name="verified" size={12} color="#A7F3D0" />
-            <Text style={styles.receiptThanksText}>Thank you! · {item.companyName || 'Al FALAH Credit System'}</Text>
+
+          {/* ── 8. Thank You ── */}
+          <View style={styles.receiptThankYou}>
+            <MaterialIcons name="verified" size={18} color="#A7F3D0" />
+            <Text style={styles.receiptThankText}>Thank you for your Payment!</Text>
           </View>
-          {/* Urdu Hidayat */}
+
+          {/* ── 9. Urdu Hidayat ── */}
           <View style={styles.receiptHidayat}>
-            <MaterialIcons name="info" size={12} color="rgba(255,255,255,0.5)" />
-            <Text style={styles.receiptHidayatText}>کسی بھی قسم کا فرق محسوس ہو تو رابطہ کریں</Text>
+            <Text style={styles.receiptHidayatText}>
+              اگر آپ کو کسی بھی قسم کا کوئی فرق محسوس ہوتا ہے بیلنس میں تو اوپر دیے گئے نمبر پر لازمی رابطہ کریں شکریہ
+            </Text>
           </View>
         </View>
       </View>
@@ -643,7 +661,7 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
   },
 
-  // Hidden receipt for image capture
+  // Hidden receipt for image capture — same format as RecoveryReceipt.tsx
   // NOTE: opacity: 0 removed — it causes captureRef to capture blank images on Android
   hiddenReceipt: {
     position: 'absolute',
@@ -651,146 +669,181 @@ const styles = StyleSheet.create({
     top: -9999,
   },
   receiptCard: {
-    width: 320,
+    width: 380,
     borderRadius: Radius.xl,
-    paddingHorizontal: 20,
-    paddingVertical: 6,
+    paddingHorizontal: 24,
+    paddingVertical: 20,
     backgroundColor: '#1D4ED8',
     overflow: 'hidden',
   },
-  receiptGradient: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 30,
-    backgroundColor: 'rgba(5,150,105,0.5)',
-    borderRadius: Radius.xl,
-  },
-  receiptHeader: {
+  // System header: AL-FALAH CREDIT SYSTEM
+  receiptSystemHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-    zIndex: 1,
-  },
-  receiptLogo: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 10,
+    marginBottom: 8,
+    zIndex: 1,
   },
-  receiptBrandName: {
+  receiptSystemTitle: {
+    fontSize: 20,
+    fontWeight: FontWeight.bold,
+    color: '#FFFFFF',
+    letterSpacing: 1.5,
+  },
+  // Company name
+  receiptCompanyName: {
+    fontSize: 17,
+    fontWeight: FontWeight.bold,
+    color: '#A7F3D0',
+    textAlign: 'center',
+    marginBottom: 4,
+    zIndex: 1,
+  },
+  // Payment Receipt label
+  receiptPaymentLabel: {
     fontSize: 15,
-    fontWeight: FontWeight.bold,
-    color: '#FFFFFF',
-  },
-  receiptBrandSub: {
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.6)',
-  },
-  receiptSep: {
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    marginBottom: 4,
-    zIndex: 1,
-  },
-  receiptRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-    zIndex: 1,
-  },
-  receiptRowLabel: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.5)',
-  },
-  receiptRowValue: {
-    fontSize: 13,
-    fontWeight: FontWeight.bold,
-    color: '#FFFFFF',
-  },
-  receiptAmountBox: {
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    borderRadius: Radius.md,
-    padding: 8,
-    marginTop: 2,
-    marginBottom: 3,
-    zIndex: 1,
-  },
-  receiptAmtRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 4,
-  },
-  receiptAmtLabel: {
-    fontSize: 13,
+    fontWeight: FontWeight.semibold,
     color: 'rgba(255,255,255,0.7)',
-  },
-  receiptAmtVal: {
-    fontSize: 15,
-    fontWeight: FontWeight.bold,
-    color: '#FFFFFF',
-  },
-  receiptAmtSep: {
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    marginVertical: 2,
-  },
-  receiptRemainingRow: {
-    backgroundColor: 'rgba(250,204,21,0.08)',
-    marginHorizontal: -6,
-    paddingHorizontal: 6,
-    borderRadius: 4,
-  },
-  receiptThanksRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
+    textAlign: 'center',
+    marginBottom: 8,
     zIndex: 1,
-  },
-  receiptThanksText: {
-    fontSize: 10,
-    color: 'rgba(255,255,255,0.4)',
   },
   // Distributor phone row
   receiptDistPhoneRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 2,
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 8,
     zIndex: 1,
   },
   receiptDistPhoneLabel: {
-    fontSize: 12,
+    fontSize: 14,
     color: 'rgba(255,255,255,0.6)',
     fontWeight: FontWeight.medium,
   },
   receiptDistPhoneValue: {
-    fontSize: 13,
+    fontSize: 16,
     color: '#A7F3D0',
     fontWeight: FontWeight.bold,
     letterSpacing: 0.3,
   },
-  // Urdu Hidayat
-  receiptHidayat: {
+  // Divider
+  receiptDivider: {
+    height: 1.5,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    marginBottom: 10,
+    zIndex: 1,
+  },
+  // Shop details section
+  receiptShopSection: {
+    marginBottom: 6,
+    zIndex: 1,
+  },
+  receiptInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 5,
+    zIndex: 1,
+  },
+  receiptInfoLabel: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.55)',
+    fontWeight: FontWeight.medium,
+    width: 75,
+  },
+  receiptInfoValue: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: FontWeight.bold,
+    color: '#FFFFFF',
+    textAlign: 'left',
+  },
+  // Orderbooker section
+  receiptOrderbookerSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+    zIndex: 1,
+  },
+  receiptOrderbookerLabel: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.55)',
+    fontWeight: FontWeight.medium,
+  },
+  receiptOrderbookerValue: {
+    fontSize: 16,
+    fontWeight: FontWeight.bold,
+    color: '#FFFFFF',
+  },
+  // Amount box
+  receiptAmountBox: {
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    borderRadius: Radius.lg,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    zIndex: 1,
+  },
+  receiptAmountRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  receiptAmountLabel: {
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.7)',
+    fontWeight: FontWeight.medium,
+  },
+  receiptAmountValue: {
+    fontSize: 17,
+    fontWeight: FontWeight.bold,
+    color: '#FFFFFF',
+  },
+  receiptAmountSeparator: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    marginVertical: 3,
+  },
+  receiptRemainingRow: {
+    backgroundColor: 'rgba(250,204,21,0.1)',
+    marginHorizontal: -14,
+    paddingHorizontal: 14,
+    borderRadius: Radius.sm,
+    marginTop: 4,
+  },
+  // Thank you section
+  receiptThankYou: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-    marginTop: 4,
+    gap: 8,
+    marginBottom: 8,
+    zIndex: 1,
+  },
+  receiptThankText: {
+    fontSize: 15,
+    color: '#A7F3D0',
+    fontWeight: FontWeight.semibold,
+  },
+  // Urdu Hidayat
+  receiptHidayat: {
+    marginTop: 6,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.1)',
     zIndex: 1,
   },
   receiptHidayatText: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.55)',
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.6)',
     fontWeight: FontWeight.medium,
     textAlign: 'center',
-    lineHeight: 18,
+    lineHeight: 22,
   },
 });
