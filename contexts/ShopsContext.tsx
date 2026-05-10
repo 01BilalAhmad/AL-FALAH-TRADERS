@@ -173,6 +173,8 @@ export function ShopsProvider({ children }: { children: ReactNode }) {
       if (status.isOnline && prev === false) {
         // Small delay to let network stabilize before syncing
         setTimeout(() => executeSyncFlowRef.current(), 1500);
+        // Also sync any offline phone updates
+        setTimeout(() => syncOfflinePhoneUpdatesRef.current(), 2000);
       }
     });
 
@@ -196,6 +198,8 @@ export function ShopsProvider({ children }: { children: ReactNode }) {
           if (queue.length > 0) {
             setTimeout(() => executeSyncFlowRef.current(), 800);
           }
+          // Also sync offline phone updates when coming to foreground
+          syncOfflinePhoneUpdatesRef.current();
         }
       }
     });
@@ -205,6 +209,46 @@ export function ShopsProvider({ children }: { children: ReactNode }) {
       appStateSub.remove();
     };
   }, []); // empty deps — safe because we use refs
+
+  // ─── Sync offline phone updates to server ──────────────────────────────────
+  const syncOfflinePhoneUpdates = useCallback(async () => {
+    try {
+      const updates = await StorageService.getOfflinePhoneUpdates();
+      if (updates.length === 0) return;
+
+      for (const update of updates) {
+        try {
+          await ApiService.updateShopPhone(update.shopId, update.phone, update.ownerName);
+          await StorageService.removeOfflinePhoneUpdate(update.shopId);
+          console.log('[PhoneSync] Synced phone for shop:', update.shopId);
+        } catch (e) {
+          console.warn('[PhoneSync] Failed to sync phone for shop:', update.shopId, e);
+          // Keep in queue for next attempt
+        }
+      }
+
+      // Refresh shops from server after phone syncs
+      if (currentUserIdRef.current) {
+        try {
+          const shops = await fetchShopsForUser(
+            currentUserIdRef.current,
+            allRoutesEnabledRef.current,
+          );
+          setTodayShops(shops);
+          setAllShops(shops);
+          await StorageService.saveShops(shops);
+        } catch { /* keep current */ }
+      }
+    } catch (e) {
+      console.warn('[PhoneSync] Error syncing phone updates:', e);
+    }
+  }, [fetchShopsForUser]);
+
+  // Keep phone sync ref up to date
+  const syncOfflinePhoneUpdatesRef = useRef(syncOfflinePhoneUpdates);
+  useEffect(() => {
+    syncOfflinePhoneUpdatesRef.current = syncOfflinePhoneUpdates;
+  }, [syncOfflinePhoneUpdates]);
 
   // ─── Load today's shops ───────────────────────────────────────────────────
   // Route-wise by default (e.g., Sunday = Sunday shops only).

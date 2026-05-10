@@ -18,6 +18,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, FontSize, FontWeight, Shadow } from '@/constants/theme';
 import { Shop } from '@/services/api';
 import { ApiService } from '@/services/api';
+import { StorageService } from '@/services/storage';
 
 interface PhoneInputModalProps {
   visible: boolean;
@@ -96,13 +97,21 @@ export function PhoneInputModal({ visible, shop, onPhoneSaved, onSkip }: PhoneIn
         shop.ownerName = trimmedOwner;
       }
 
-      // Try to save to server (will fail offline, but that's OK)
+      // Always save to local shops cache first (so app refresh doesn't lose the number)
+      await StorageService.updateShopPhoneInCache(shop.id, normalized, trimmedOwner || undefined);
+
+      // Try to save to server
       try {
         await ApiService.updateShopPhone(shop.id, normalized, trimmedOwner || undefined);
       } catch (apiErr: any) {
-        // API call failed (likely offline) — phone is still saved locally on the shop object
-        // The phone will be used for receipt/WhatsApp, and will sync when online
-        console.warn('[PhoneInputModal] API save failed (offline?), using local:', apiErr?.message);
+        // API call failed (likely offline) — queue it for later sync
+        console.warn('[PhoneInputModal] API save failed (offline?), queuing for sync:', apiErr?.message);
+        await StorageService.addOfflinePhoneUpdate({
+          shopId: shop.id,
+          phone: normalized,
+          ownerName: trimmedOwner || undefined,
+          createdAt: new Date().toISOString(),
+        });
       }
 
       onPhoneSaved(normalized, trimmedOwner || undefined);

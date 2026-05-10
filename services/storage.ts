@@ -20,6 +20,7 @@ const KEYS = {
   NOTIF_SHOPS: 'af_notif_shops', // track unique shop IDs for SMS/WhatsApp
   VISITED_SHOPS: 'af_visited_shops',
   RECOVERY_SUBMITTED_SHOPS: 'af_recovery_submitted_shops',
+  OFFLINE_PHONE_UPDATES: 'af_offline_phone_updates',
 };
 
 export interface PendingNotification {
@@ -54,6 +55,13 @@ export interface OfflineRecovery {
 export interface ShopLastRecovery {
   shopId: string;
   lastRecoveryDate: string;
+}
+
+export interface OfflinePhoneUpdate {
+  shopId: string;
+  phone: string;
+  ownerName?: string;
+  createdAt: string;
 }
 
 export interface ShopNote {
@@ -531,5 +539,50 @@ export const StorageService = {
       entry.shopIds = entry.shopIds.filter((id: string) => id !== shopId);
       await AsyncStorage.setItem(KEYS.RECOVERY_SUBMITTED_SHOPS, JSON.stringify(entry));
     } catch { /* non-critical */ }
+  },
+
+  // --- Offline Phone Updates (synced to server when online) ---
+  addOfflinePhoneUpdate: async (update: OfflinePhoneUpdate) => {
+    const raw = await AsyncStorage.getItem(KEYS.OFFLINE_PHONE_UPDATES);
+    const queue: OfflinePhoneUpdate[] = raw ? JSON.parse(raw) : [];
+    // Replace existing entry for same shopId
+    const idx = queue.findIndex((u) => u.shopId === update.shopId);
+    if (idx >= 0) {
+      queue[idx] = update;
+    } else {
+      queue.push(update);
+    }
+    await AsyncStorage.setItem(KEYS.OFFLINE_PHONE_UPDATES, JSON.stringify(queue));
+  },
+
+  getOfflinePhoneUpdates: async (): Promise<OfflinePhoneUpdate[]> => {
+    const raw = await AsyncStorage.getItem(KEYS.OFFLINE_PHONE_UPDATES);
+    return raw ? JSON.parse(raw) : [];
+  },
+
+  removeOfflinePhoneUpdate: async (shopId: string) => {
+    const raw = await AsyncStorage.getItem(KEYS.OFFLINE_PHONE_UPDATES);
+    const queue: OfflinePhoneUpdate[] = raw ? JSON.parse(raw) : [];
+    const filtered = queue.filter((u) => u.shopId !== shopId);
+    await AsyncStorage.setItem(KEYS.OFFLINE_PHONE_UPDATES, JSON.stringify(filtered));
+  },
+
+  clearOfflinePhoneUpdates: async () => {
+    await AsyncStorage.setItem(KEYS.OFFLINE_PHONE_UPDATES, JSON.stringify([]));
+  },
+
+  // --- Update phone in local shops cache (AsyncStorage) ---
+  updateShopPhoneInCache: async (shopId: string, phone: string, ownerName?: string) => {
+    const raw = await AsyncStorage.getItem(KEYS.SHOPS);
+    if (!raw) return;
+    const shops: Shop[] = JSON.parse(raw);
+    const idx = shops.findIndex((s) => s.id === shopId);
+    if (idx >= 0) {
+      shops[idx].phone = phone;
+      if (ownerName) {
+        shops[idx].ownerName = ownerName;
+      }
+      await AsyncStorage.setItem(KEYS.SHOPS, JSON.stringify(shops));
+    }
   },
 };
