@@ -232,26 +232,52 @@ export function RecoveryReceipt({
   };
 
   /**
-   * Re-send: open WhatsApp directly (image already saved in gallery)
+   * Re-send: recapture receipt image, save to gallery, open WhatsApp
    */
   const handleResend = async () => {
-    if (!shopPhone) {
-      Alert.alert('No Phone Number', 'This shop has no phone number for WhatsApp.');
-      return;
-    }
+    if (isCapturing) return;
+    setIsCapturing(true);
 
-    const phone = formatPhoneIntl(shopPhone);
-    const whatsappUrl = `https://wa.me/${phone}`;
-    const canOpen = await Linking.canOpenURL(whatsappUrl);
-    if (canOpen) {
-      await Linking.openURL(whatsappUrl);
-      Alert.alert(
-        'WhatsApp Opened',
-        `WhatsApp chat opened for ${shopName}.\n\nTap attachment → Gallery → "AlFalah Receipts" → Select receipt → Send`,
-        [{ text: 'OK' }]
-      );
-    } else {
-      Alert.alert('WhatsApp Not Available', 'Please install WhatsApp.');
+    try {
+      const uri = await captureAndSaveToGallery();
+      if (uri) {
+        setSavedImageUri(uri);
+      }
+
+      // Open WhatsApp chat directly to shopkeeper's number
+      if (shopPhone) {
+        const phone = formatPhoneIntl(shopPhone);
+        const whatsappUrl = `https://wa.me/${phone}`;
+        const canOpen = await Linking.canOpenURL(whatsappUrl);
+        if (canOpen) {
+          await Linking.openURL(whatsappUrl);
+          Alert.alert(
+            'Receipt Re-saved!',
+            `New receipt image saved in Gallery (AlFalah Receipts)!\n\nWhatsApp chat opened for ${shopName}.\n\nTap attachment → Gallery → Select latest receipt → Send`,
+            [{ text: 'OK' }]
+          );
+        } else {
+          Alert.alert('WhatsApp Not Available', 'Please install WhatsApp.');
+        }
+      } else {
+        Alert.alert('No Phone Number', 'This shop has no phone number for WhatsApp.');
+      }
+    } catch (error: any) {
+      console.error('[RecoveryReceipt] Resend failed:', error);
+      // Fallback: just open WhatsApp without new image
+      if (shopPhone) {
+        const phone = formatPhoneIntl(shopPhone);
+        Alert.alert(
+          'Image Error',
+          'Receipt image dobara save nahi hua. WhatsApp chat kholen?',
+          [
+            { text: 'WhatsApp Kholo', onPress: () => Linking.openURL(`https://wa.me/${phone}`) },
+            { text: 'Cancel', style: 'cancel' },
+          ]
+        );
+      }
+    } finally {
+      setIsCapturing(false);
     }
   };
 
