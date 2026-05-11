@@ -64,12 +64,12 @@ export function ShopsProvider({ children }: { children: ReactNode }) {
     allRoutesEnabled: boolean,
   ): Promise<Shop[]> => {
     if (allRoutesEnabled) {
-      // All routes mode: fetch ALL shops for this orderbooker (including zero balance)
-      return await ApiService.getShops({ orderbookerId: userId, balanceOnly: false });
+      // All routes mode: fetch shops with balance > 0 OR had transaction today (hide permanently zero-balance shops)
+      return await ApiService.getShops({ orderbookerId: userId, balanceOnly: false, hideZeroBalance: true });
     } else {
-      // Route-wise mode: fetch only today's route shops (including zero balance)
+      // Route-wise mode: fetch today's route shops (hide permanently zero-balance shops)
       const todayDay = getTodayDayName();
-      return await ApiService.getShops({ orderbookerId: userId, routeDay: todayDay, balanceOnly: false });
+      return await ApiService.getShops({ orderbookerId: userId, routeDay: todayDay, balanceOnly: false, hideZeroBalance: true });
     }
   }, []);
 
